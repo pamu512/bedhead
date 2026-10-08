@@ -17,6 +17,8 @@ Design rules:
 
 from __future__ import annotations
 
+import math
+
 import cv2
 import numpy as np
 
@@ -106,15 +108,20 @@ def _skin_tone_stats(roi_bgr: np.ndarray, face: FaceFrame) -> tuple[np.ndarray, 
 
 
 def _roi(face: FaceFrame, margin: float = 0.18) -> tuple[int, int, int, int]:
-    """Bounding box of the face oval + margin, clipped to the frame."""
+    """Bounding box of the face oval + margin, clipped to the frame.
+
+    Every edge is clamped independently into the frame, so a face hanging
+    past an edge (or fully outside it) still yields an ordered, in-range
+    box; degenerate slivers are skipped by the caller.
+    """
     pts = face.landmarks[list(FACE_OVAL), :2]
     x0, y0 = pts.min(axis=0)
     x1, y1 = pts.max(axis=0)
     mx, my = (x1 - x0) * margin, (y1 - y0) * margin
-    x0 = int(max(0, x0 - mx))
-    y0 = int(max(0, y0 - my))
-    x1 = int(min(face.w - 1, x1 + mx))
-    y1 = int(min(face.h - 1, y1 + my))
+    x0 = int(np.clip(x0 - mx, 0, face.w - 1))
+    y0 = int(np.clip(y0 - my, 0, face.h - 1))
+    x1 = int(np.clip(x1 + mx, 0, face.w - 1))
+    y1 = int(np.clip(y1 + my, 0, face.h - 1))
     return x0, y0, x1, y1
 
 
@@ -122,8 +129,11 @@ def _roi(face: FaceFrame, margin: float = 0.18) -> tuple[int, int, int, int]:
 
 def _retouch_roi(roi: np.ndarray, face: FaceFrame, preset: Preset) -> np.ndarray:
     """All face effects, computed inside the ROI only."""
-    out = roi.copy()
     h, w = face.h, face.w
+    # cv2.resize((w // 2, h // 2)) throws when a side is under 2px.
+    if h < 2 or w < 2 or roi.shape[0] < 2 or roi.shape[1] < 2:
+        return roi
+    out = roi.copy()
 
     s_skin = preset.scaled("skin")
     s_eye = preset.scaled("under_eye")
@@ -135,7 +145,8 @@ def _retouch_roi(roi: np.ndarray, face: FaceFrame, preset: Preset) -> np.ndarray
     tone, tone_bright = _skin_tone_stats(roi, face)
 
     # --- skin smoothing (edge-preserving, skin-only, computed at half res)
-    if s_skin > 0:
+    # Half-res filters need a 2px neighborhood; a 2–3px sliver would be 1px.
+    if s_skin > 0 and w // 2 >= 2 and h // 2 >= 2:
         small = cv2.resize(roi, (w // 2, h // 2), interpolation=cv2.INTER_LINEAR)
         smooth_small = cv2.edgePreservingFilter(small, flags=1, sigma_s=60, sigma_r=0.45)
         smooth = cv2.resize(smooth_small, (w, h), interpolation=cv2.INTER_LINEAR)
@@ -173,7 +184,7 @@ def _retouch_roi(roi: np.ndarray, face: FaceFrame, preset: Preset) -> np.ndarray
             out = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
     # --- hairline softening (experimental, half-res blur)
-    if s_hair > 0:
+    if s_hair > 0 and w // 2 >= 2 and h // 2 >= 2:
         band = hairline_band_mask(face)
         small = cv2.resize(roi, (w // 2, h // 2), interpolation=cv2.INTER_LINEAR)
         blur_small = cv2.bilateralFilter(small, 9, 50, 50)
@@ -195,9 +206,9 @@ def apply(
     """Main entry: returns the retouched (or passthrough) frame."""
     if cache is None:
         cache = {}
-    if face is None or preset.intensity <= 0:
-        return frame_bgr
-    if preset.show_original:
+    intensity = preset.intensity
+    # NaN fails `<= 0` and would poison the blend; +inf still clamps to full.
+    if face is None or preset.show_original or math.isnan(intensity) or intensity <= 0:
         return frame_bgr
 
     out = frame_bgr.copy()
@@ -209,8 +220,18 @@ def apply(
         out = cv2.add(out, tuple(int(round(v)) for v in lift))
 
     # --- face effects inside the ROI only
+    fh, fw = out.shape[:2]
+    if fh < 1 or fw < 1:
+        return out
     x0, y0, x1, y1 = _roi(face)
+    x0 = min(max(x0, 0), fw - 1)
+    x1 = min(max(x1, 0), fw - 1)
+    y0 = min(max(y0, 0), fh - 1)
+    y1 = min(max(y1, 0), fh - 1)
     roi = out[y0:y1 + 1, x0:x1 + 1]
+    # cv2.resize((w // 2, h // 2)) throws when a side is under 2px.
+    if roi.shape[0] < 2 or roi.shape[1] < 2:
+        return out
     shifted = FaceFrame(
         landmarks=face.landmarks - np.array([x0, y0, 0], dtype=np.float32),
         score=face.score,

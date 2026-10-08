@@ -35,9 +35,14 @@ def _download(url: str, dest: Path) -> None:
         else:
             print(f"\r[bedhead]   {done // 1024} KiB", end="")
 
-    urllib.request.urlretrieve(url, tmp, reporthook=hook)
-    print()
-    tmp.rename(dest)
+    try:
+        urllib.request.urlretrieve(url, tmp, reporthook=hook)
+        print()
+        tmp.replace(dest)
+    except Exception:
+        print()
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def ensure_models() -> dict[str, Path]:

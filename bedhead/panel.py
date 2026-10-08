@@ -6,7 +6,6 @@ The panel edits ~/.bedhead/preset.json; the pipeline hot-reloads it each second.
 
 from __future__ import annotations
 
-import json
 import tkinter as tk
 from pathlib import Path
 from tkinter import ttk
@@ -75,7 +74,7 @@ class Panel(tk.Tk):
 
     def _save(self) -> None:
         PRESET_PATH.parent.mkdir(parents=True, exist_ok=True)
-        PRESET_PATH.write_text(json.dumps(self.preset.__dict__, indent=2))
+        self.preset.save(str(PRESET_PATH))
 
 
 if __name__ == "__main__":

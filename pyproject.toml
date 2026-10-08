@@ -10,6 +10,12 @@ dependencies = [
     "pyvirtualcam>=0.11",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pyyaml",
+]
+
 [project.scripts]
 bedhead = "bedhead.cli:main"
 

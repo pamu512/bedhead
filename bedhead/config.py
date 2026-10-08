@@ -3,7 +3,27 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import asdict, dataclass, field, fields
+from pathlib import Path
+
+
+def _is_finite_number(value: object) -> bool:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
+def _clamp01(value: float) -> float:
+    value = float(value)
+    if math.isnan(value) or value <= 0.0:
+        return 0.0
+    if value >= 1.0:
+        return 1.0
+    return value
 
 
 @dataclass
@@ -20,18 +40,37 @@ class Preset:
     show_original: bool = False     # A/B bypass (also bypasses virtual camera output)
 
     def scaled(self, name: str) -> float:
-        return max(0.0, min(1.0, getattr(self, name))) * max(0.0, min(1.0, self.intensity))
+        return _clamp01(getattr(self, name)) * _clamp01(self.intensity)
 
     def save(self, path: str) -> None:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(asdict(self), f, indent=2)
+        dest = Path(path)
+        payload = json.dumps(asdict(self), indent=2)
+        tmp = dest.with_name(dest.name + ".part")
+        try:
+            tmp.write_text(payload, encoding="utf-8")
+            tmp.replace(dest)
+        except Exception:
+            tmp.unlink(missing_ok=True)
+            raise
 
     @classmethod
     def load(cls, path: str) -> "Preset":
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
+        if not isinstance(data, dict):
+            raise ValueError(f"{path}: preset JSON must be an object")
         valid = {f.name for f in fields(cls)}
-        return cls(**{k: v for k, v in data.items() if k in valid})
+        kwargs: dict = {}
+        for key, value in data.items():
+            if key not in valid:
+                continue
+            if key == "show_original":
+                if not isinstance(value, bool):
+                    raise ValueError(f"{path}: show_original must be a boolean")
+            elif not _is_finite_number(value):
+                raise ValueError(f"{path}: {key} must be a finite number")
+            kwargs[key] = value
+        return cls(**kwargs)
 
     def describe(self) -> str:
         return (
