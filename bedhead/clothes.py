@@ -31,6 +31,12 @@ CLOTHES_CATEGORY = 4
 
 _FEATHER_K = 31
 
+# Logo/text print detection thresholds (on the half-res deviation map):
+# a print is a COMPACT blob whose color deviates hard from the garment median.
+_LOGO_DEV_T = 55.0        # min worst-channel deviation to count as "print"
+_LOGO_AREA_FRAC = 0.12    # blobs larger than this fraction of the garment are
+                          # treated as pattern (stripes), not prints - left alone
+
 
 def _feather(mask: np.ndarray, k: int = _FEATHER_K) -> np.ndarray:
     k = k | 1
@@ -144,7 +150,8 @@ def tidy(
         return frame_bgr
     s_clothes = preset.scaled("clothes")
     s_stain = preset.scaled("stain")
-    if s_clothes <= 0 and s_stain <= 0:
+    s_logo = preset.scaled("logo_blur")
+    if s_clothes <= 0 and s_stain <= 0 and s_logo <= 0:
         return frame_bgr
 
     box = _mask_bbox(mask)
@@ -166,21 +173,50 @@ def tidy(
         delta = cv2.resize(delta_small, (rw, rh), interpolation=cv2.INTER_LINEAR)
         out = np.clip(out.astype(np.float32) + delta, 0, 255).astype(np.uint8)
 
-    # --- stain / color-unevenness pull (low-to-moderate deviations only)
-    if s_stain > 0:
+    # --- shared half-res deviation map (stain fade + logo/text blur)
+    if (s_stain > 0 or s_logo > 0) and rw >= 8 and rh >= 8:
         med = _garment_median(roi, mroi).astype(np.float32)
-        # deviation computed at half res; the effect is low-frequency by design
         hw2, hh2 = rw // 2, rh // 2
         half = cv2.resize(out, (hw2, hh2), interpolation=cv2.INTER_LINEAR).astype(np.float32)
         m_half = cv2.resize(mroi, (hw2, hh2), interpolation=cv2.INTER_LINEAR).astype(np.float32) / 255.0
         dev = np.abs(half - med).max(axis=2)
-        # ramp: 0 at dev<=12, 1 at dev~55, back toward 0 for extreme deviations
-        # (>=150) so crisp prints and stripes survive the steam.
-        ramp = np.clip((dev - 12.0) / 43.0, 0, 1) * np.clip((150.0 - dev) / 40.0, 0, 1)
-        alpha = m_half * ramp * s_stain * 0.8
-        delta_small = (med - half) * alpha[..., None]
-        delta = cv2.resize(delta_small, (rw, rh), interpolation=cv2.INTER_LINEAR)
-        out = np.clip(out.astype(np.float32) + delta, 0, 255).astype(np.uint8)
+
+        # --- stain / color-unevenness pull (low-to-moderate deviations only)
+        if s_stain > 0:
+            # ramp: 0 at dev<=12, 1 at dev~55, back toward 0 for extreme deviations
+            # (>=150) so crisp prints and stripes survive the steam.
+            ramp = np.clip((dev - 12.0) / 43.0, 0, 1) * np.clip((150.0 - dev) / 40.0, 0, 1)
+            alpha = m_half * ramp * s_stain * 0.8
+            delta_small = (med - half) * alpha[..., None]
+            delta = cv2.resize(delta_small, (rw, rh), interpolation=cv2.INTER_LINEAR)
+            out = np.clip(out.astype(np.float32) + delta, 0, 255).astype(np.uint8)
+
+        # --- logo / text blur: redact compact high-contrast prints on the garment
+        if s_logo > 0:
+            garment_px = float((m_half > 0.5).sum())
+            if garment_px >= 64:
+                prints = ((dev > _LOGO_DEV_T) & (m_half > 0.5)).astype(np.uint8) * 255
+                kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
+                prints = cv2.morphologyEx(prints, cv2.MORPH_CLOSE, kernel)
+                prints = cv2.dilate(prints, kernel, iterations=1)
+                n, labels, stats, _ = cv2.connectedComponentsWithStats(prints, connectivity=8)
+                keep = np.zeros_like(prints)
+                lo_area = max(24.0, garment_px * 0.0008)
+                hi_area = garment_px * _LOGO_AREA_FRAC
+                for i in range(1, n):
+                    area = float(stats[i, cv2.CC_STAT_AREA])
+                    if lo_area <= area <= hi_area:
+                        keep[labels == i] = 255
+                if keep.any():
+                    logo_mask = cv2.resize(keep, (rw, rh), interpolation=cv2.INTER_LINEAR)
+                    logo_mask = cv2.GaussianBlur(logo_mask, (21, 21), 0)
+                    a = (logo_mask.astype(np.float32) / 255.0) * s_logo
+                    blurred = cv2.GaussianBlur(out, (41, 41), 0)
+                    out = np.clip(
+                        out.astype(np.float32) * (1 - a[..., None])
+                        + blurred.astype(np.float32) * a[..., None],
+                        0, 255,
+                    ).astype(np.uint8)
 
     frame_bgr[y0:y1 + 1, x0:x1 + 1] = out
     return frame_bgr

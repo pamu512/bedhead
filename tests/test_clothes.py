@@ -83,9 +83,55 @@ def test_tidy_zero_strength_passthrough():
 def test_tidy_garment_silhouette_survives():
     """Strong edges (shirt outline) must not be smeared into background."""
     frame, mask = _shirt_frame()
-    out = tidy(frame.copy(), mask, Preset(intensity=1.0, clothes=1.0, stain=1.0))
+    out = tidy(frame.copy(), mask, Preset(intensity=1.0, clothes=1.0, stain=1.0, logo_blur=1.0))
     # sample a point just outside the shirt edge: should stay background
     assert tuple(out[10, 320]) == tuple(frame[10, 320])
+
+
+# ---------------------------------------------------------------- logo blur
+
+def _logo_shirt_frame(w: int = 640, h: int = 480) -> tuple[np.ndarray, np.ndarray]:
+    """Shirt frame with a compact high-contrast 'logo' print on the chest."""
+    f, mask = _shirt_frame(w, h)
+    chest = (w // 2, 430)
+    cv2.rectangle(f, (chest[0] - 30, chest[1] - 18), (chest[0] + 30, chest[1] + 18), (255, 255, 255), -1)
+    cv2.putText(f, "LOGO", (chest[0] - 27, chest[1] + 7), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 200), 2)
+    return f, mask
+
+
+def test_logo_blur_flattens_print():
+    """A compact high-contrast print must lose detail (variance drop) under blur."""
+    frame, mask = _logo_shirt_frame()
+    p = Preset(intensity=1.0, clothes=0.0, stain=0.0, logo_blur=1.0)
+    out = tidy(frame.copy(), mask, p)
+    y, x = 430, 320
+    win_in = frame[y - 14:y + 14, x - 34:x + 34].astype(np.float32)
+    win_out = out[y - 14:y + 14, x - 34:x + 34].astype(np.float32)
+    assert win_out.var() < win_in.var() * 0.6, (
+        f"print variance should drop sharply ({win_in.var():.0f} -> {win_out.var():.0f})"
+    )
+
+
+def test_logo_blur_off_leaves_print():
+    """Same frame, dial off: print must survive untouched."""
+    frame, mask = _logo_shirt_frame()
+    out = tidy(frame.copy(), mask, Preset(intensity=1.0, clothes=0.0, stain=0.0, logo_blur=0.0))
+    assert np.array_equal(out, frame)
+
+
+def test_logo_blur_preserves_stripes():
+    """Wide stripes (large-area deviation) are pattern, not prints: no redaction."""
+    f = np.full((480, 640, 3), (40, 50, 60), np.uint8)
+    for yy in range(250, 480, 44):  # horizontal stripes across the torso area
+        f[yy:yy + 22, 100:540] = (200, 200, 200)
+    mask = np.zeros((480, 640), np.uint8)
+    mask[250:480, 100:540] = 255
+    mask = cv2.GaussianBlur(mask, (31, 31), 0)
+    out = tidy(f.copy(), mask, Preset(intensity=1.0, clothes=0.0, stain=0.0, logo_blur=1.0))
+    # stripe edge sharpness must survive: gradient magnitude inside garment similar
+    g_in = cv2.Laplacian(cv2.cvtColor(f, cv2.COLOR_BGR2GRAY), cv2.CV_64F).var()
+    g_out = cv2.Laplacian(cv2.cvtColor(out, cv2.COLOR_BGR2GRAY), cv2.CV_64F).var()
+    assert g_out > g_in * 0.85, f"stripes should survive ({g_in:.0f} -> {g_out:.0f})"
 
 
 # ---------------------------------------------------------------- guard rails

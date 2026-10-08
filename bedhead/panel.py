@@ -38,6 +38,7 @@ class Panel(tk.Tk):
             ("hairline", "Hairline soften (exp.)"),
             ("clothes", "Clothes: crease softening"),
             ("stain", "Clothes: stain fade"),
+            ("logo_blur", "Clothes: blur logos/text"),
             ("soft_light", "Soft light"),
         )
         for name, label in rows:

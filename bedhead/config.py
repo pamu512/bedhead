@@ -38,6 +38,7 @@ class Preset:
     hairline: float = 0.0           # EXPERIMENTAL: soften stray strands along hairline band
     clothes: float = 0.5             # crease/wrinkle softening on the garment mask
     stain: float = 0.4               # pull faint stains/shading toward garment color
+    logo_blur: float = 0.0           # blur logo/text prints on the garment (redaction)
     soft_light: float = 0.25        # gentle exposure lift + warmth, NVIDIA-brightness style
     show_original: bool = False     # A/B bypass (also bypasses virtual camera output)
 
@@ -78,7 +79,7 @@ class Preset:
         return (
             f"intensity={self.intensity:.2f} skin={self.skin:.2f} under_eye={self.under_eye:.2f} "
             f"shine={self.shine:.2f} teeth={self.teeth:.2f} hairline={self.hairline:.2f} "
-            f"clothes={self.clothes:.2f} stain={self.stain:.2f} "
+            f"clothes={self.clothes:.2f} stain={self.stain:.2f} logo_blur={self.logo_blur:.2f} "
             f"soft_light={self.soft_light:.2f}"
         )
 
