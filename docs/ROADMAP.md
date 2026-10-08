@@ -9,6 +9,7 @@ Full background: see the product & engineering brief (repo `assets/` + local `be
 - [x] Repo + CI-less spike structure
 - [x] MediaPipe tracking (VIDEO mode, blendshapes for jawOpen/blink)
 - [x] Tier A effects: skin, under-eye, shine, teeth, hairline, soft-light
+- [x] Clothes tidy-up: garment segmentation + crease soften + stain fade (steam iron)
 - [x] Preview + keyboard A/B + dials
 - [x] Virtual camera sink (OBS path on macOS)
 - [x] Tk control panel with hot-reload
