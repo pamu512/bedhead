@@ -36,6 +36,8 @@ class Panel(tk.Tk):
             ("shine", "Shine control"),
             ("teeth", "Teeth whitening"),
             ("hairline", "Hairline soften (exp.)"),
+            ("clothes", "Clothes: crease softening"),
+            ("stain", "Clothes: stain fade"),
             ("soft_light", "Soft light"),
         )
         for name, label in rows:

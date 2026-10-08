@@ -54,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--height", type=int, default=720)
     ap.add_argument("--fps", type=int, default=30)
     ap.add_argument("--cam", action="store_true", help="enable virtual camera output")
+    ap.add_argument("--no-clothes", action="store_true", help="disable clothes tidy-up (skip segmenter)")
     ap.add_argument("--no-preview", action="store_true", help="disable preview window")
     ap.add_argument("--preset", default=None, help="named preset (subtle|rescue) or JSON path")
     ap.add_argument("--list-cameras", action="store_true")
@@ -85,6 +86,17 @@ def main(argv: list[str] | None = None) -> int:
     cap.set(cv2.CAP_PROP_FPS, args.fps)
 
     tracker = FaceTracker()
+
+    segmenter = None
+    if not args.no_clothes:
+        try:
+            from .clothes import ClothesSegmenter
+
+            segmenter = ClothesSegmenter()
+            print("[bedhead] clothes tidy-up enabled (segmenter ready)")
+        except Exception as e:  # noqa: BLE001
+            print(f"[bedhead] clothes tidy-up unavailable ({e.__class__.__name__}); continuing face-only.")
+            segmenter = None
 
     vcam: VirtualCamSink | None = None
     if args.cam:
@@ -126,6 +138,12 @@ def main(argv: list[str] | None = None) -> int:
             t0 = time.perf_counter()
             face = tracker.detect(frame, frame_i * 1000 // max(args.fps, 1))
             out = apply(frame, face, preset, cache)
+            if segmenter is not None:
+                from .clothes import tidy
+
+                ts_ms = frame_i * 1000 // max(args.fps, 1)
+                cmask = segmenter.clothes_mask_cached(frame, ts_ms)
+                out = tidy(out, cmask, preset)
             proc_ms = (time.perf_counter() - t0) * 1000
             proc_ms_ema = proc_ms if frame_i == 0 else proc_ms_ema * 0.9 + proc_ms * 0.1
 
@@ -180,6 +198,8 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         cap.release()
         tracker.close()
+        if segmenter is not None:
+            segmenter.close()
         if vcam is not None:
             vcam.close()
         if preview is not None:
