@@ -42,7 +42,10 @@ class Panel(tk.Tk):
             ("logo_blur", "Clothes: blur logos/text"),
             ("soft_light", "Soft light"),
             ("color_match", "Color match (reference)"),
+            ("vibrance", "Vibrance (dull-pixel color)"),
+            ("detail_boost", "Detail boost (sharpness)"),
             ("studio_light", "Studio light (person relight)"),
+            ("background_darken", "Background darken (subject pop)"),
             ("eye_light", "Eye light (awake)"),
             ("background_strength", "Background strength"),
         )

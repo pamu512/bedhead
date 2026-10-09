@@ -13,10 +13,14 @@ P0.5 (Python). Tier A retouch rebuilt on a research-grade quality engine, plus t
 - ✅ MediaPipe 478-point face tracking (VIDEO mode, ~5 ms/frame on CPU), one-euro smoothed
 - ✅ Quality-engine retouch: guided-filter frequency separation, LAB pipeline, local-percentile shine, hysteresis teeth gate, selective sharpening (~9 ms/frame for all face effects at 720p on Apple Silicon)
 - ✅ Reference-guided: identity-gated gallery reference, autotune, continuous ambient adaptation, Reinhard color match (~4.6 ms/frame, cached reference stats)
+- ✅ Measured under-eye correction: landmark-keyed tear-trough band (convex-hull geometry, below-lash-line start), darkness-proportional dodge
+- ✅ Subject pop: continuous background darken from live-vs-reference background L* (studio preset arms it; LookTracker adapts it)
+- ✅ Detail boost + vibrance (face-oval ROI, L*-preserving LAB chroma): webcam-soft faces sharpened ~114% HF retention, dull skin resaturated without touching luma
 - ✅ Person segmentation (selfie-multiclass): true person masks, EMA-smoothed, every-3rd-frame
 - ✅ Background blur / darken (Zoom Portrait / NVIDIA-class, feathered composite)
 - ✅ Studio Light: relight the person only, background untouched (Apple Continuity-class)
 - ✅ Eye light: landmark-gated brightness for an awake look
+- ✅ 8-metric quality benchmark (bedhead/benchmark.py): under-eye gap, texture retention, color dE, exposure, subject pop, saturation, temporal pump, latency, all measured live against your reference photo
 - ✅ Identity preservation verified: 43/43 VidTIMIT subjects, 3,512 frames, retouched faces still match their profile picture (mean SFace cosine 0.83 vs 0.363 threshold; no frame degrades below its original)
 - ✅ Virtual camera output via OBS (macOS) or native (Windows)
 - ✅ Preview window with A/B toggle + keyboard dials (incl. k/i/b/n for the new effects)

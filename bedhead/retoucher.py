@@ -444,4 +444,4 @@ def apply(
 def _seg_effects_active(preset: Preset) -> bool:
     return (
         preset.background_strength > 0 and preset.background_mode != "off"
-    ) or preset.studio_light > 0
+    ) or preset.studio_light > 0 or preset.background_darken > 0
