@@ -88,6 +88,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--reference", default=None, metavar="PHOTO",
                     help="reference photo for identity-guarded features (gallery upload OK; "
                          "must match the face on camera to be used)")
+    ap.add_argument("--auto-match", action="store_true",
+                    help="with --reference: derive effect strengths from the reference look "
+                         "(exposure/warmth/sharpness match) and apply them")
     ap.add_argument("--list-cameras", action="store_true")
     ap.add_argument("--version", action="version", version=f"bedhead {__version__}")
     args = ap.parse_args(argv)
@@ -142,6 +145,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[bedhead] sampling {LIVE_SAMPLES} live frames to check the reference "
               f"matches the face on camera ...")
         live_embs: list[np.ndarray] = []
+        live_frames: list[np.ndarray] = []
         attempts = 0
         while len(live_embs) < LIVE_SAMPLES and attempts < LIVE_SAMPLES * 6:
             attempts += 1
@@ -154,13 +158,33 @@ def main(argv: list[str] | None = None) -> int:
             e = guard.embed(frame)
             if e is not None:
                 live_embs.append(e)
+                live_frames.append(frame)
         result = guard.admit(ref_emb, live_embs)
         if not result.admitted:
             print(f"[bedhead] reference rejected: {result.reason}", file=sys.stderr)
             print("[bedhead] continuing WITHOUT the reference (Tier A only).", file=sys.stderr)
         else:
             print(f"[bedhead] reference admitted: {result.reason}")
-        # Tier B will consume the admitted embedding; not used by Tier A effects.
+            if args.auto_match:
+                # reference-guided autotune: measure look gap on the sampled
+                # live frames and derive effect strengths from it
+                from dataclasses import asdict
+
+                from .autotune import apply_autotune, autotune
+
+                live_sample = live_frames[-1] if live_frames else None
+                if live_sample is not None:
+                    at = autotune(live_sample, photo)
+                    for note in at.notes:
+                        print(f"[bedhead] auto-match: {note}")
+                    merged = apply_autotune(asdict(preset), at)
+                    for k, v in merged.items():
+                        setattr(preset, k, v)
+                    print(f"[bedhead] auto-match applied: {preset.describe()}")
+                    try:
+                        preset.save(str(PRESET_PATH))
+                    except OSError as e:
+                        print(f"[bedhead] could not save preset: {e}")
 
     segmenter: Segmenter | None = None
 

@@ -329,11 +329,22 @@ def apply(
         seg_skin = segmenter.face_skin_mask() if segmenter is not None else None
         out = _apply_face_effects(out, face, preset, seg_skin)
 
-    # --- soft light: global gentle warm lift (cheap saturated add, no float pass)
+    # --- soft light: global warm lift with highlight roll-off (LUT, O(1)).
+    # Rolling lift (strongest in shadows, zero at white) closes dark-webcam
+    # gaps without clipping highlights the way a flat additive would.
     s_light = preset.scaled("soft_light")
     if s_light > 0:
-        lift = (0, 4 * s_light, 9 * s_light)  # BGR: warm = +R
-        out = cv2.add(out, tuple(round(v) for v in lift))
+        v = np.arange(256, dtype=np.float32)
+        roll = (1.0 - v / 255.0)  # 1 at black, 0 at white
+        lut_r = np.clip(v + 60.0 * s_light * roll, 0, 255).astype(np.uint8)
+        lut_g = np.clip(v + 24.0 * s_light * roll, 0, 255).astype(np.uint8)
+        lut_b = np.clip(v + 8.0 * s_light * roll, 0, 255).astype(np.uint8)
+        chans = cv2.split(out)
+        out = cv2.merge([
+            cv2.LUT(chans[0], lut_b),
+            cv2.LUT(chans[1], lut_g),
+            cv2.LUT(chans[2], lut_r),
+        ])
 
     return out
 

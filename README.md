@@ -96,6 +96,12 @@ bedhead --reference ~/Pictures/good-day.jpg
 
 The reference is only used after it passes an on-device admission check: bedhead samples ~15 live frames, embeds the face on camera and the face in the photo (ArcFace), and requires cosine similarity >= 0.40 (calibrated: same-person photos score 0.73+, different people score below 0.1). A photo of someone else is rejected and the run continues Tier-A-only. Requires the `guard` extra: `pip install 'bedhead[guard]'`. Once Tier B lands, its output will additionally be drift-capped against the admitted reference (fail-safe to Tier A).
 
+With `--auto-match`, the admitted reference also tunes the Tier A effects: bedhead measures the exposure/warmth/sharpness gap between the live feed and the reference photo and derives `soft_light` / `studio_light` / `under_eye` / `skin` strengths that move your live look toward the photo's look (classical effects only, nothing generative):
+
+```
+bedhead --reference ~/Pictures/good-day.jpg --auto-match
+```
+
 ## How it works
 
 ```
