@@ -28,6 +28,7 @@ import cv2
 import numpy as np
 
 from . import __version__
+from .autotune import LookTracker
 from .config import BACKGROUND_MODES, PRESETS, Preset
 from .guard import LIVE_SAMPLES, IdentityGuard
 from .retoucher import apply
@@ -120,6 +121,7 @@ def main(argv: list[str] | None = None) -> int:
     cap.set(cv2.CAP_PROP_FPS, args.fps)
 
     tracker = FaceTracker()
+    look_tracker: LookTracker | None = None  # set when --auto-match is admitted
 
     # --- reference photo admission (gallery upload allowed, identity-gated) ---
     if args.reference:
@@ -166,11 +168,11 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"[bedhead] reference admitted: {result.reason}")
             if args.auto_match:
-                # reference-guided autotune: measure look gap on the sampled
-                # live frames and derive effect strengths from it
+                # reference-guided autotune: one-shot suggestions at startup,
+                # then continuous ambient adaptation while the call runs
                 from dataclasses import asdict
 
-                from .autotune import apply_autotune, autotune
+                from .autotune import LookTracker, apply_autotune, autotune
 
                 live_sample = live_frames[-1] if live_frames else None
                 if live_sample is not None:
@@ -181,6 +183,10 @@ def main(argv: list[str] | None = None) -> int:
                     for k, v in merged.items():
                         setattr(preset, k, v)
                     print(f"[bedhead] auto-match applied: {preset.describe()}")
+                    look_tracker = LookTracker(photo)
+                    look_tracker.prime(live_sample)
+                    print("[bedhead] auto-match: continuous mode on "
+                          "(ambient adaptation every ~2 s)")
                     try:
                         preset.save(str(PRESET_PATH))
                     except OSError as e:
@@ -352,6 +358,11 @@ def main(argv: list[str] | None = None) -> int:
 
             # housekeeping
             now = time.perf_counter()
+            if look_tracker is not None and look_tracker.tick(frame):
+                for k, v in look_tracker.current.items():
+                    setattr(preset, k, v)
+                print("[bedhead] auto-match adapted: "
+                      + " ".join(f"{k}={v:.2f}" for k, v in look_tracker.current.items()))
             if now - t_reload > 1.0 and PRESET_PATH.exists():
                 t_reload = now
                 mtime = PRESET_PATH.stat().st_mtime

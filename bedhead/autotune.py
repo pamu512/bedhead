@@ -14,6 +14,7 @@ classical effects only.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 
 import cv2
@@ -109,3 +110,88 @@ def apply_autotune(base_preset_dict: dict, result: AutotuneResult) -> dict:
     merged = dict(base_preset_dict)
     merged.update(result.preset_delta)
     return merged
+
+
+# ---------------------------------------------------------------------
+# Continuous mode: re-measure periodically while the call runs.
+# ---------------------------------------------------------------------
+
+# Fields the continuous tracker may adapt (ambient-driven, never taste keys).
+CONTINUOUS_FIELDS = ("soft_light", "studio_light")
+
+
+class LookTracker:
+    """Tracks the live look vs the reference and adapts lighting strengths.
+
+    Runs a measurement + suggest cycle at most every `interval` seconds and
+    EMA-smooths the suggested strengths so changes never pop. Only
+    CONTINUOUS_FIELDS are touched; user taste keys (skin, teeth, ...) stay
+    wherever the user set them. A deadband suppresses micro-adjustments.
+    """
+
+    def __init__(
+        self,
+        reference_bgr: np.ndarray,
+        interval_s: float = 2.0,
+        ema: float = 0.25,
+        deadband: float = 0.03,
+        face_mask_fn=None,
+    ) -> None:
+        self._ref_stats = _stats(reference_bgr)
+        self.interval = interval_s
+        self.ema = ema            # weight of the NEW suggestion per cycle
+        self.deadband = deadband  # ignore suggested deltas below this
+        self._face_mask_fn = face_mask_fn
+        self._last_run: float | None = None  # clock-agnostic; set on first tick
+        self.current: dict[str, float] = {k: 0.0 for k in CONTINUOUS_FIELDS}
+        self._primed = False
+        self.notes: list[str] = []
+
+    def prime(self, frame_bgr: np.ndarray) -> None:
+        """Seed strengths from one frame (the startup measurement)."""
+        at = self._suggest(frame_bgr)
+        for k in CONTINUOUS_FIELDS:
+            self.current[k] = at.get(k, 0.0)
+        self._primed = True
+        self._last_run = None  # next tick re-syncs the clock
+
+    def tick(self, frame_bgr: np.ndarray, now: float | None = None) -> bool:
+        """Maybe re-measure; returns True if strengths changed."""
+        if not self._primed:
+            self.prime(frame_bgr)
+            return True
+        t = time.monotonic() if now is None else now
+        if self._last_run is None:
+            self._last_run = t  # first tick after prime: sync clock, no measure
+            return False
+        if t - self._last_run < self.interval:
+            return False
+        self._last_run = t
+        at = self._suggest(frame_bgr)
+        changed = False
+        self.notes = []
+        for k in CONTINUOUS_FIELDS:
+            target = at.get(k, 0.0)
+            if abs(target - self.current[k]) < self.deadband:
+                continue
+            self.current[k] = (1.0 - self.ema) * self.current[k] + self.ema * target
+            changed = True
+        return changed
+
+    def _suggest(self, frame_bgr: np.ndarray) -> dict[str, float]:
+        mask = self._face_mask_fn() if self._face_mask_fn is not None else None
+        s_live = _stats(frame_bgr, mask)
+        dL = self._ref_stats["L"] - s_live["L"]
+        d_warm = self._ref_stats["b"] - s_live["b"]
+        out: dict[str, float] = {}
+        # exposure: suggestion tracks the live gap continuously; inside the
+        # +-4 deadband the gap is closed, so ease off (never "hold": a held
+        # high strength would over-brighten once ambient recovers)
+        out["soft_light"] = _clamp01(dL / 40.0)
+        if dL < 0:
+            out["soft_light"] = 0.0
+        if d_warm > 3:
+            out["studio_light"] = _clamp01(d_warm / 30.0)
+        else:
+            out["studio_light"] = 0.0
+        return out
