@@ -12,6 +12,7 @@ P0.5 (Python). Tier A retouch rebuilt on a research-grade quality engine, plus t
 
 - ✅ MediaPipe 478-point face tracking (VIDEO mode, ~5 ms/frame on CPU), one-euro smoothed
 - ✅ Quality-engine retouch: guided-filter frequency separation, LAB pipeline, local-percentile shine, hysteresis teeth gate, selective sharpening (~9 ms/frame for all face effects at 720p on Apple Silicon)
+- ✅ Reference-guided: identity-gated gallery reference, autotune, continuous ambient adaptation, Reinhard color match (~4.6 ms/frame, cached reference stats)
 - ✅ Person segmentation (selfie-multiclass): true person masks, EMA-smoothed, every-3rd-frame
 - ✅ Background blur / darken (Zoom Portrait / NVIDIA-class, feathered composite)
 - ✅ Studio Light: relight the person only, background untouched (Apple Continuity-class)
