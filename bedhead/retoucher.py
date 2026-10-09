@@ -222,10 +222,11 @@ def _retouch_roi(
             base[skin_m > 200], 60)) if (skin_m > 200).any() else float(np.mean(base))
         # darkness-proportional dodge: darkest pixels get pulled all the way
         # to cheek level (capped), bright pixels barely move -- measured on
-        # the bench: flat 50% blend left a 30-level gap at full strength
-        deficit = np.clip(cheek_l - base, 0, 55)
+        # the bench: flat 50% blend left a 30-level gap at full strength.
+        # Cap 70: raw deficits up to 82 L* observed under harsh top light.
+        deficit = np.clip(cheek_l - base, 0, 70)
         target = base + deficit * (0.45 + 0.5 * s_eye) + detail * 0.7
-        a = (eye_m.astype(np.float32) / 255.0) * min(1.0, 0.5 + s_eye * 0.5)
+        a = (eye_m.astype(np.float32) / 255.0) * min(1.0, 0.6 + s_eye * 0.4)
         lab = cv2.cvtColor(out, cv2.COLOR_BGR2LAB)
         lf = lab[..., 0].astype(np.float32)
         lab[..., 0] = np.clip(lf * (1 - a) + target * a, 0, 255).astype(np.uint8)
