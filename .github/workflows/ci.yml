@@ -100,3 +100,71 @@ jobs:
         with:
           name: bedhead-macos-arm64
           path: dist/bedhead
+
+  installer-macos:
+    name: macOS installer (.pkg)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build binary + pkg
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[guard]" pyinstaller
+          pyinstaller bedhead.spec --noconfirm
+          env -i HOME=$(mktemp -d) PATH=/usr/bin:/bin ./dist/bedhead --version
+          bash scripts/build_mac_installer.sh
+
+      - name: Smoke the pkg (expand + verify payload)
+        run: |
+          pkgutil --expand dist/bedhead-*.pkg /tmp/pkgx
+          test -f /tmp/pkgx/Payload && echo "payload ok"
+          pkgutil --check-signature dist/bedhead-*.pkg || echo "unsigned (ad-hoc) pkg: expected in CI without certs"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bedhead-macos-pkg
+          path: dist/*.pkg
+
+  installer-windows:
+    name: Windows installer (Inno Setup)
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the one-file binary
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[guard]" pyinstaller
+          pyinstaller bedhead.spec --noconfirm
+          ./dist/bedhead.exe --version
+
+      - name: Install Inno Setup + build installer
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          $env:PATH = "C:\Program Files (x86)\Inno Setup 6;$env:PATH"
+          ISCC.exe installer\bedhead.iss
+
+      - name: Verify installer output exists
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem dist\bedhead-*-windows-x64.exe
+          if (-not $exe) { throw "installer exe not produced" }
+          "$($exe.FullName) -> $([math]::Round($exe.Length/1MB,1)) MB"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bedhead-windows-installer
+          path: dist/bedhead-*-windows-x64.exe

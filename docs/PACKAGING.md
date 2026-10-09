@@ -3,12 +3,29 @@
 The `bedhead` CLI ships as a single-file executable (PyInstaller) so a clean
 machine needs no Python, no venv, no pip.
 
+## Installers
+
+- **macOS**: `scripts/build_mac_installer.sh` wraps the binary in a
+  standards-compliant `.pkg` (pkgbuild, identifier `com.pamu512.bedhead`,
+  installs to `/usr/local/bin`). `--sign`/`--notarize` flags sign with a
+  Developer ID Installer cert and staple (same keychain profile as
+  `scripts/notarize.sh`: `bedhead-notary`). CI builds and smokes it every
+  push (artifact `bedhead-macos-pkg`).
+- **Windows**: `installer/bedhead.iss` (Inno Setup) builds
+  `bedhead-<version>-windows-x64.exe`: per-user install, adds the install
+  dir to the user `PATH`, Start-menu shortcuts, uninstaller. CI builds it
+  on `windows-latest` via chocolatey Inno Setup (artifact
+  `bedhead-windows-installer`). Build locally: `ISCC.exe installer\bedhead.iss`.
+  Note: pyvirtualcam on Windows uses the OBS virtual camera driver that
+  ships with an OBS Studio install; the preview works without it.
+
 ## Build (macOS, from the repo root)
 
 ```bash
 uv venv && uv pip install -e ".[guard,test]" pyinstaller
 .venv/bin/pyinstaller bedhead.spec --noconfirm
 ./dist/bedhead --version
+bash scripts/build_mac_installer.sh   # -> dist/bedhead-<version>-macos.pkg
 ```
 
 Output: `dist/bedhead` (~160 MB; mediapipe + opencv-contrib + onnxruntime

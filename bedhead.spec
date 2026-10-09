@@ -1,26 +1,24 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller spec for the bedhead CLI (macOS first; same spec works on Linux).
+# PyInstaller spec for the bedhead CLI (macOS, Linux, Windows).
 # The Tk panel is optional (users can run python -m bedhead.panel from source),
 # so it is excluded to keep the bundle lean; everything else is one-file.
 
+import sysconfig
+
 block_cipher = None
+
+# site-packages of the BUILD venv, portable across platforms/CI
+SITE = sysconfig.get_paths()["purelib"]
 
 a = Analysis(
     ["bedhead/__main__.py"],
     pathex=["."],
     binaries=[
         # mediapipe.tasks.c is loaded dynamically by mediapipe's python code;
-        # PyInstaller's static analysis misses the dylib and the package data.
-        (
-            ".venv/lib/python3.12/site-packages/mediapipe/tasks/c/*",
-            "mediapipe/tasks/c",
-        ),
+        # PyInstaller's static analysis misses the native libs and package data.
+        (SITE + "/mediapipe/tasks/c/*", "mediapipe/tasks/c"),
     ],
-    datas=[
-        # ximgproc/guidedFilter needs the contrib opencv dylib; PyInstaller
-        # finds cv2 automatically, but the mediapipe task-file stubs do not
-        # ship (models download to the user cache at first run instead).
-    ],
+    datas=[],
     hiddenimports=[
         "bedhead",
         "bedhead.cli",
@@ -36,6 +34,8 @@ a = Analysis(
         "bedhead.tierb",
         "bedhead.tracker",
         "bedhead.clothes",
+        "bedhead.benchmark",
+        "bedhead.freqblend",
         "pyvirtualcam",
         "insightface.model_zoo",
     ],
