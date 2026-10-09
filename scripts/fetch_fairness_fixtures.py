@@ -1,6 +1,7 @@
 """Fetch more diverse face photos from Wikimedia Commons (10/person target)."""
 import json
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -37,7 +38,7 @@ def fetch(url, dest):
     try:
         with urllib.request.urlopen(req, timeout=25) as r:
             data = r.read()
-    except Exception:
+    except (OSError, urllib.error.URLError):
         return False
     if len(data) < 40000:
         return False

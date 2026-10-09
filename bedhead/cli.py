@@ -33,7 +33,7 @@ from .guard import LIVE_SAMPLES, IdentityGuard
 from .retoucher import apply
 from .segmenter import Segmenter
 from .sinks import PreviewWindow, VirtualCamSink
-from .tracker import FaceTracker
+from .tracker import FACE_OVAL, FaceTracker
 
 PRESET_PATH = Path.home() / ".bedhead" / "preset.json"
 MAX_CONSECUTIVE_READ_FAILURES = 100  # ~5 s of retries before giving up
@@ -134,6 +134,11 @@ def main(argv: list[str] | None = None) -> int:
             print("[bedhead] no face found in the reference photo; "
                   "pick a clear, front-facing shot.", file=sys.stderr)
             return 2
+        if guard.last_pose and abs(guard.last_pose[1]) > 35:
+            print(f"[bedhead] note: the reference face is turned "
+                  f"({guard.last_pose[1]:.0f} deg yaw); heavily angled photos "
+                  "often fail the match check. A front-facing photo of the same "
+                  "person matches much more reliably.", file=sys.stderr)
         print(f"[bedhead] sampling {LIVE_SAMPLES} live frames to check the reference "
               f"matches the face on camera ...")
         live_embs: list[np.ndarray] = []
@@ -259,7 +264,9 @@ def main(argv: list[str] | None = None) -> int:
             face = tracker.detect(frame, frame_i * 1000 // max(args.fps, 1))
             seg = _get_segmenter()
             if seg is not None:
-                seg.tick(frame, frame_i * 1000 // max(args.fps, 1))
+                oval = (face.landmarks[list(FACE_OVAL), :2].astype(int)
+                        if face is not None else None)
+                seg.tick(frame, frame_i * 1000 // max(args.fps, 1), face_oval_pts=oval)
             # A/B is preview-only: the virtual camera always gets the retouched
             # frame, so toggling it mid-call can never leak the unretouched feed.
             effect_preset = preset if not preset.show_original else replace(

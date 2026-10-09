@@ -86,22 +86,48 @@ class Segmenter:
                 newv = cur * MASK_EMA + up * (1 - MASK_EMA)
                 setattr(self, name, newv)
 
-    def tick(self, frame_bgr: np.ndarray, ts_ms: int) -> None:
-        """Call once per processed frame; runs the model every `interval`."""
+    def tick(
+        self,
+        frame_bgr: np.ndarray,
+        ts_ms: int,
+        face_oval_pts: np.ndarray | None = None,
+    ) -> None:
+        """Call once per processed frame; runs the model every `interval`.
+
+        `face_oval_pts`: optional (N, 2) int polygon of the tracked face oval.
+        When provided, the person mask is unioned with the filled oval (with
+        the same feather) so the face can never be eaten by background blur
+        even if the segmenter under-covers it (observed on some darker skin
+        tones where face pixels route to low-confidence classes).
+        """
         self._h, self._w = frame_bgr.shape[:2]
+        self._oval = face_oval_pts
         self._frames_seen += 1
         if self.person is None or self._frames_seen % self.interval == 0:
             self._ts = max(self._ts + 1, ts_ms)
             self._update(frame_bgr, self._ts)
 
+    def _oval_mask(self, feather: int) -> np.ndarray | None:
+        if getattr(self, "_oval", None) is None:
+            return None
+        m = np.zeros((self._h, self._w), np.float32)
+        cv2.fillPoly(m, [np.asarray(self._oval, np.int32)], 1.0)
+        k = feather | 1
+        return cv2.GaussianBlur(m, (k, k), 0)
+
     # ------------------------------------------------------------------ sinks
 
     def person_mask(self, feather: int = FEATHER_K) -> np.ndarray:
-        """Feathered person mask [0,1] at frame resolution."""
-        if self.person is None:
+        """Feathered person mask [0,1] at frame resolution, oval-unioned."""
+        if self.person is None and getattr(self, "_oval", None) is None:
             return np.zeros((self._h, self._w), np.float32)
         k = feather | 1
-        return cv2.GaussianBlur(self.person, (k, k), 0)
+        base = np.zeros((self._h, self._w), np.float32) if self.person is None \
+            else cv2.GaussianBlur(self.person, (k, k), 0)
+        ov = self._oval_mask(feather)
+        if ov is not None:
+            base = np.maximum(base, ov)
+        return base
 
     def face_skin_mask(self, feather: int = FEATHER_K) -> np.ndarray:
         if self.face_skin is None:

@@ -60,15 +60,24 @@ class IdentityGuard:
             providers = ["CPUExecutionProvider"]
         self._app = FaceAnalysis(name="buffalo_l", providers=providers)
         self._app.prepare(ctx_id=0, det_size=(640, 640))
+        # set by embed(): (pitch, yaw, roll) of the largest face, or None
+        self.last_pose: tuple[float, float, float] | None = None
 
     def embed(self, image_bgr: np.ndarray) -> np.ndarray | None:
         """Largest detected face -> normed 512-d embedding, or None."""
         faces = self._app.get(image_bgr)
         if not faces:
+            self.last_pose = None
             return None
         f = max(
             faces,
             key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]),
+        )
+        pose = getattr(f, "pose", None)
+        self.last_pose = (
+            (float(pose[0]), float(pose[1]), float(pose[2]))
+            if pose is not None and len(pose) >= 3
+            else None
         )
         return f.normed_embedding
 
