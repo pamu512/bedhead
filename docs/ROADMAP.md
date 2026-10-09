@@ -2,37 +2,57 @@
 
 Full background: see the product & engineering brief (`docs/PRODUCT-BRIEF.md.html`).
 
-## P0 — Spike (now)
+## P0 / P0.5 — Spike + quality engine (SHIPPED)
 
 **Goal:** Tier A retouch, real camera in → virtual camera out, 30 fps @720p.
 
-- [x] Repo + CI-less spike structure
-- [x] MediaPipe tracking (VIDEO mode, blendshapes for jawOpen/blink)
-- [x] Tier A effects: skin, under-eye, shine, teeth, hairline, soft-light
-- [x] Clothes tidy-up: garment segmentation + crease soften + stain fade (steam iron)
-- [x] Preview + keyboard A/B + dials
-- [x] Virtual camera sink (OBS path on macOS)
-- [x] Tk control panel with hot-reload
-- [x] Headless test suite (synthetic mesh, no camera needed) + CI
-- [ ] Field-test on real calls (Zoom/Meet/Teams)
-- [ ] Benchmark: sustained fps on 3-year-old laptop, effect strengths at defaults
+Shipped and measured:
 
-**Exit criteria:** side-by-side A/B demo makes people say "left one, please."
+- [x] MediaPipe 478-pt tracking (VIDEO mode, one-euro smoothed, ~5 ms/frame)
+- [x] Quality-engine retouch: guided-filter frequency separation, LAB
+      pipeline, local-percentile shine, hysteresis teeth gate (~9 ms/frame)
+- [x] Reference-guided: identity-gated gallery reference (ArcFace cosine
+      >= 0.40 admission), autotune, continuous ambient adaptation
+      (LookTracker), Reinhard color match, face_lift exposure closer
+- [x] Person segmentation: background blur/darken, studio light, subject
+      pop with closed-loop background control (camera AE coupling measured
+      and documented; built-in Mac cameras expose NO AE control via
+      AVFoundation — see `bedhead/aelock.py`)
+- [x] Under-eye correction: convex-hull tear-trough band, darkness-
+      proportional dodge, measured (was a 28-px no-op mask)
+- [x] Detail boost + vibrance (face-oval ROI): ~114-125% HF retention
+- [x] Clothes tidy-up, preview A/B + dials + reference PiP, Tk panel
+- [x] Virtual camera sink (OBS macOS / native Windows)
+- [x] Headless suite (222 tests) + CI (ruff + pytest, 3.10-3.13) + binary
+      build with clean-machine smoke ([docs/PACKAGING.md](PACKAGING.md))
+- [x] 8-metric quality benchmark (`bedhead/benchmark.py`) vs
+      competitor-derived targets; best clean live session 6/8 PASS with
+      color dE 1.3, saturation 2.2, exposure 7.0, texture 96-125%,
+      temporal pump 0.02-0.03, latency 31-45 ms
+- [x] Fairness audit: 99-photo/15-person corpus (east/south Asian, african
+      descent); guard passes all groups; documented tracker-lock gaps at
+      extreme yaw (51-59 deg) and very dark captures (L* 69-76)
+- [x] MIT license
 
-## P1 — Tier B demo (4–8 weeks)
+## P1 — Tier B demo (in progress)
 
 **Goal:** "good-day me" — generative re-render from one reference photo, identity-guarded.
 
-- [ ] Onboarding: reference photo from camera OR gallery upload, identity-gated
-      (ArcFace admission check — SHIPPED in `bedhead/guard.py`: cosine >= 0.40,
-      calibrated same-person 0.73-0.78 vs cross-person -0.04-0.06;
-      run `bedhead --reference photo.jpg`)
-- [ ] LivePortrait (or PersonaLive-class) inference on GPU, ~12–30 ms/frame
-- [ ] Identity guard runtime: drift cap on Tier B output (cosine >= 0.35 vs reference
-      embedding), temporal smoothing, fail-safe to Tier A
-- [ ] Blend dial: Tier A ↔ Tier B continuous mix
+- [x] IN Swapper 128 spike under the full guard contract (admitted
+      reference only, drift cap 0.35 every 10 frames, progressive
+      fail-safe: blend halving before disable)
+- [x] Frequency-separable composite: low-freq identity from the swap,
+      native-res high-freq texture from the camera (HF = raw exactly)
+- [x] CoreML-assisted inference profiling (~64-76 ms/frame CPU+ANE
+      partitioning; pure CPU 205 ms; fp16 a measured regression)
+- [ ] Real-time Tier B (< 45 ms/frame): needs a full ANE/GPU engine port
+- [ ] 256px-class model: hyperswap_1a_256 evaluated and CLOSED (46x too
+      slow on CPU + embedding-space mismatch; see
+      [TIERB-256-EVAL.md](TIERB-256-EVAL.md) for reopen conditions)
+- [ ] Fairness: tracker-lock recovery at extreme yaw (one-euro bridging /
+      temporal retry)
 
-**Exit criteria:** 60-second continuous demo, expressions live, no waxiness.
+**Exit criteria:** 60-second continuous demo, expressions live, no waxiness, real-time.
 
 ## P2 — Alpha native app (2–3 months)
 
@@ -40,7 +60,7 @@ Full background: see the product & engineering brief (`docs/PRODUCT-BRIEF.md.htm
 - [ ] CMIO camera extension (App Store-eligible virtual camera)
 - [ ] Encrypted on-device preset store; uninstall = gone
 - [ ] Optional status indicator + one-click kill switch
-- [ ] Notarized Developer ID build
+- [ ] Notarized Developer ID build (script exists: `scripts/notarize.sh`)
 
 **Exit criteria:** clean-machine install < 5 min, week of daily-driver dogfood, ~0 crashes.
 

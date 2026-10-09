@@ -1,7 +1,8 @@
 [project]
 name = "bedhead"
 version = "0.1.0"
-description = "Bed Head - look presentable on video calls. P0 spike: Tier A mesh-aware retouch pipeline."
+description = "Bed Head - look presentable on video calls. Tier A mesh-aware retouch pipeline."
+license = "MIT"
 requires-python = ">=3.10,<3.14"
 dependencies = [
     "mediapipe>=0.10.14",
