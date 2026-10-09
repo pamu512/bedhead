@@ -34,7 +34,7 @@ from .guard import LIVE_SAMPLES, IdentityGuard
 from .retoucher import apply
 from .segmenter import Segmenter
 from .sinks import PreviewWindow, VirtualCamSink
-from .tracker import FACE_OVAL, FaceTracker
+from .tracker import FACE_OVAL, FaceFrame, FaceTracker
 
 PRESET_PATH = Path.home() / ".bedhead" / "preset.json"
 MAX_CONSECUTIVE_READ_FAILURES = 100  # ~5 s of retries before giving up
@@ -151,6 +151,7 @@ def main(argv: list[str] | None = None) -> int:
 
     tracker = FaceTracker()
     look_tracker: LookTracker | None = None  # set when --auto-match is admitted
+    latest_face: FaceFrame | None = None  # closure cell for face_fn (bound per frame)
     reference_img: np.ndarray | None = None  # the admitted reference photo
     cm_cache: dict = {}  # reference-stats cache for color_match (per run)
     tier_b = None  # TierB engine, only when --tier-b and reference admitted
@@ -241,7 +242,7 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"[bedhead] auto-match applied (color_match "
                           f"{preset.color_match:.2f}): {preset.describe()}")
                     look_tracker = LookTracker(photo, face_mask_fn=lambda: live_face_mask,
-                                               face_fn=lambda: face,
+                                               face_fn=lambda: latest_face,
                                                ref_face_mask=ref_face_mask)
                     look_tracker.prime(live_sample)
                     print("[bedhead] auto-match: continuous mode on "
@@ -352,6 +353,7 @@ def main(argv: list[str] | None = None) -> int:
 
             t0 = time.perf_counter()
             face = tracker.detect(frame, frame_i * 1000 // max(args.fps, 1))
+            latest_face = face  # published to the LookTracker's face_fn
             seg = _get_segmenter()
             if seg is not None:
                 oval = (face.landmarks[list(FACE_OVAL), :2].astype(int)
