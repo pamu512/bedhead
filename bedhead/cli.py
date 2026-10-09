@@ -92,6 +92,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--auto-match", action="store_true",
                     help="with --reference: derive effect strengths from the reference look "
                          "(exposure/warmth/sharpness match) and apply them")
+    ap.add_argument("--tier-b", action="store_true",
+                    help="with --reference: enable guarded generative re-render (spike; "
+                         "admitted reference only, drift-capped, fail-safe to Tier A)")
     ap.add_argument("--list-cameras", action="store_true")
     ap.add_argument("--version", action="version", version=f"bedhead {__version__}")
     args = ap.parse_args(argv)
@@ -124,6 +127,8 @@ def main(argv: list[str] | None = None) -> int:
     look_tracker: LookTracker | None = None  # set when --auto-match is admitted
     reference_img: np.ndarray | None = None  # the admitted reference photo
     cm_cache: dict = {}  # reference-stats cache for color_match (per run)
+    tier_b = None  # TierB engine, only when --tier-b and reference admitted
+    tier_b_blend = 1.0
 
     # --- reference photo admission (gallery upload allowed, identity-gated) ---
     if args.reference:
@@ -170,6 +175,17 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"[bedhead] reference admitted: {result.reason}")
             reference_img = photo
+            if args.tier_b:
+                from .tierb import TierB, TierBError
+
+                try:
+                    tier_b = TierB(guard=guard)
+                    tier_b.set_reference(photo)  # only reachable post-admission
+                    print("[bedhead] Tier B armed: admitted reference registered "
+                          "(drift-capped; fails safe to Tier A)")
+                except (TierBError, Exception) as e:  # noqa: BLE001
+                    print(f"[bedhead] Tier B unavailable: {e.__class__.__name__}: {e}")
+                    tier_b = None
             if args.auto_match:
                 # reference-guided autotune: one-shot suggestions at startup,
                 # then continuous ambient adaptation while the call runs
@@ -319,6 +335,12 @@ def main(argv: list[str] | None = None) -> int:
                 ts_ms = frame_i * 1000 // max(args.fps, 1)
                 cmask = cseg.clothes_mask_cached(frame, ts_ms)
                 out = tidy(out, cmask, preset)
+            # Tier B: guarded generative re-render over the Tier A frame
+            if tier_b is not None:
+                out, tb_status = tier_b.process(frame, out, blend=tier_b_blend)
+                if tb_status.startswith("disabled"):
+                    print(f"[bedhead] Tier B: {tb_status}; staying on Tier A")
+                    tier_b = None
             proc_ms = (time.perf_counter() - t0) * 1000
             proc_ms_ema = proc_ms if frame_i == 0 else proc_ms_ema * 0.9 + proc_ms * 0.1
 
@@ -352,6 +374,8 @@ def main(argv: list[str] | None = None) -> int:
                     preset.soft_light = (preset.soft_light + 0.1) % 1.1
                 elif key in ("m", "M"):
                     preset.color_match = (preset.color_match + 0.2) % 1.2
+                elif key in ("g", "G"):
+                    tier_b_blend = (tier_b_blend + 0.25) % 1.25 if tier_b is not None else 0.0
                 elif key in ("b", "B"):
                     preset.background_strength = (preset.background_strength + 0.2) % 1.2
                 elif key in ("k", "K"):
