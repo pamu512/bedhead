@@ -20,8 +20,8 @@ P0.5 (Python). Tier A retouch rebuilt on a research-grade quality engine, plus t
 - ✅ Background blur / darken (Zoom Portrait / NVIDIA-class, feathered composite)
 - ✅ Studio Light: relight the person only, background untouched (Apple Continuity-class)
 - ✅ Eye light: landmark-gated brightness for an awake look
-- ✅ 8-metric quality benchmark (bedhead/benchmark.py): under-eye gap, texture retention, color dE, exposure, subject pop, saturation, temporal pump, latency, all measured live against your reference photo
-- ✅ Identity preservation verified: 43/43 VidTIMIT subjects, 3,512 frames, retouched faces still match their profile picture (mean SFace cosine 0.83 vs 0.363 threshold; no frame degrades below its original)
+- ✅ 8-metric quality benchmark (bedhead/benchmark.py): under-eye gap, texture retention, color dE, exposure, subject pop, saturation, temporal pump, latency, all measured live against your reference photo; results with provenance and reproduction commands in [docs/RESULTS.md](docs/RESULTS.md)
+- ✅ Identity preservation verified: 43/43 VidTIMIT subjects, 3,512 frames, mean SFace cosine 0.83 vs 0.363 threshold, worst per-frame drop <= 0.03 (method + reproduction in [docs/RESULTS.md](docs/RESULTS.md))
 - ✅ Virtual camera output via OBS (macOS: obs-mac-virtualcam; Windows: pyvirtualcam on the OBS virtual camera driver that ships with OBS Studio)
 - ✅ Preview window with A/B toggle + keyboard dials (incl. k/i/b/n for the new effects)
 - ✅ Live control panel (`bedhead.panel`) with preset hot-reload
@@ -34,7 +34,7 @@ P0.5 (Python). Tier A retouch rebuilt on a research-grade quality engine, plus t
 - 🧪 Tier B spike SHIPPED (guarded): `bedhead --reference you.jpg --tier-b` runs IN Swapper
   under the full guard contract (admitted-reference-only, drift-capped every 10 frames,
   progressive fail-safe — blend halves before disable, fail-safe to Tier A, `g` blend dial).
-  Frequency-separable composite keeps native-resolution skin texture (HF = raw exactly).
+  Frequency-separable composite keeps the aligned crop's high-frequency band (measured cheek HF equal to the crop's; the crop is 128px, so pore-level detail beyond that resolution is not invented).
   CoreML-assisted ~64-76 ms/frame on
   Apple Silicon (CPU-only 205 ms; fp16 a measured regression); real-time
   needs a full ANE/GPU engine port (P1). 256px hyperswap evaluated and

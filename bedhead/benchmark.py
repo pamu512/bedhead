@@ -1,10 +1,11 @@
 """bedhead quality benchmark: 8 metrics that define 'outperform the market'.
 
-Each metric is measured on live captures against a reference photo, with a
-target derived from what shipped competitors deliver (NVIDIA Broadcast,
-Apple Studio Light/Continuity, Meitu-class retouch, Zoom). Output:
-PASS/FAIL per target + a composite score. This is the acceptance gate for
-'better than what is on the market' -- no subjective claims.
+Each metric is measured on live captures against a reference photo.
+Targets were authored from public competitor claims and spec sheets (what
+a good retouch product should deliver); competitors were NOT run locally,
+so these are engineering targets, not head-to-head measurements.
+Output: PASS/FAIL per target + a composite score. This is the acceptance
+gate for the quality bar -- no subjective claims.
 
 Metrics:
   1. under_eye_gap    cheek-to-undereye L* deficit after correction

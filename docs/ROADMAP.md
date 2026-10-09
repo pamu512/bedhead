@@ -26,7 +26,7 @@ Shipped and measured:
 - [x] Headless suite (222 tests) + CI (ruff + pytest, 3.10-3.13) + binary
       build with clean-machine smoke ([docs/PACKAGING.md](PACKAGING.md))
 - [x] 8-metric quality benchmark (`bedhead/benchmark.py`) vs
-      competitor-derived targets; best clean live session 6/8 PASS with
+      engineering targets authored from public competitor claims; best clean live session 6/8 PASS with
       color dE 1.3, saturation 2.2, exposure 7.0, texture 96-125%,
       temporal pump 0.02-0.03, latency 31-45 ms
 - [x] Fairness audit: 99-photo/15-person corpus (east/south Asian, african
