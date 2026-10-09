@@ -28,7 +28,7 @@ class AutotuneResult:
 
 
 def _stats(img_bgr: np.ndarray, mask: np.ndarray | None = None) -> dict:
-    """Robust per-channel stats (median) + luminance + sharpness (Laplacian var)."""
+    """Robust per-channel stats (median) + luminance + saturation + sharpness."""
     sel = None
     if mask is not None:
         m = (mask > 0.5).astype(np.uint8)
@@ -41,9 +41,15 @@ def _stats(img_bgr: np.ndarray, mask: np.ndarray | None = None) -> dict:
     L = float(lab[0, 0, 0])
     a = float(lab[0, 0, 1])   # green(-) .. red(+)
     b = float(lab[0, 0, 2])   # blue(-) .. yellow(+)
+    hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+    if mask is not None and sel is not img_bgr.reshape(-1, 3):
+        mm = (mask > 0.5)
+        sat = float(hsv[..., 1][mm[:hsv.shape[0], :hsv.shape[1]]].mean())
+    else:
+        sat = float(hsv[..., 1].mean())
     gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
     sharp = float(cv2.Laplacian(gray, cv2.CV_64F).var())
-    return {"med_bgr": med, "L": L, "a": a, "b": b, "sharp": sharp}
+    return {"med_bgr": med, "L": L, "a": a, "b": b, "sat": sat, "sharp": sharp}
 
 
 def _clamp01(v: float) -> float:
@@ -69,7 +75,7 @@ def autotune(
 
     # Exposure: soft_light lifts up to ~+9 R; scale by how dark we are vs ref.
     if dL > 4:
-        delta["soft_light"] = _clamp01(dL / 40.0)
+        delta["soft_light"] = _clamp01(dL / 20.0)  # measured: strength 1.0 lifts face L* ~20
         notes.append(f"live is {dL:.0f} L* darker than reference -> soft_light {delta['soft_light']:.2f}")
     elif dL < -4:
         delta["soft_light"] = 0.0
@@ -83,6 +89,14 @@ def autotune(
         notes.append(f"reference is warmer (db* {d_warm:.0f}) -> studio_light {delta['studio_light']:.2f}")
     else:
         delta["studio_light"] = 0.0
+
+    # Vibrance: webcams desaturate; lift dull pixels toward the reference sat.
+    d_sat = s_ref.get("sat", 0.0) - s_live.get("sat", 0.0)
+    if d_sat > 5:
+        delta["vibrance"] = _clamp01(d_sat / 40.0)
+        notes.append(f"live face desaturated (dsat {d_sat:.0f}) -> vibrance {delta['vibrance']:.2f}")
+    else:
+        delta["vibrance"] = 0.0
 
     # Under-eye: darker under-eye area in live vs ref is hard to measure
     # without landmarks; keep bounded default when ref looks fresher (brighter L).
@@ -187,7 +201,7 @@ class LookTracker:
         # exposure: suggestion tracks the live gap continuously; inside the
         # +-4 deadband the gap is closed, so ease off (never "hold": a held
         # high strength would over-brighten once ambient recovers)
-        out["soft_light"] = _clamp01(dL / 40.0)
+        out["soft_light"] = _clamp01(dL / 20.0)
         if dL < 0:
             out["soft_light"] = 0.0
         if d_warm > 3:

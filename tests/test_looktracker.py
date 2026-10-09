@@ -25,12 +25,14 @@ def test_prime_seeds_from_frame():
 
 def test_tick_respects_interval():
     lt = LookTracker(_img(150), interval_s=2.0)
-    lt.prime(_img(120))  # moderate gap: soft_light ~0.6
+    lt.prime(_img(140))  # small gap: soft_light ~0.5 under the /20 mapping
+    assert 0.3 < lt.current["soft_light"] < 0.8
     # first tick: clock sync only
-    assert lt.tick(_img(120), now=100.0) is False
+    assert lt.tick(_img(140), now=100.0) is False
     # before the interval elapses: no re-measure
     assert lt.tick(_img(60), now=101.0) is False
-    # after the interval: re-measures and adapts (frame got much darker)
+    # after the interval: re-measures and adapts (frame got much darker ->
+    # suggestion clamps to 1.0, current moves up)
     changed = lt.tick(_img(40), now=103.0)
     assert changed is True
     assert lt.current["soft_light"] > 0.6

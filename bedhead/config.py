@@ -43,6 +43,7 @@ class Preset:
     logo_blur: float = 0.0           # blur logo/text prints on the garment (redaction)
     soft_light: float = 0.25        # gentle exposure lift + warmth, NVIDIA-brightness style
     color_match: float = 0.0        # reference color match (Reinhard LAB transfer, 0=off)
+    vibrance: float = 0.0           # saturation lift weighted to dull pixels (anti-webcam-gray)
     studio_light: float = 0.0       # relight the person only (Apple Studio Light class)
     eye_light: float = 0.0          # brighten eye region for an awake look
     background_strength: float = 0.0  # blur/darken background (needs segmentation)

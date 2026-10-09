@@ -75,6 +75,19 @@ def list_cameras() -> None:
     print("Use --camera <index> to pick one.")
 
 
+def _face_bbox_mask(guard, img: np.ndarray) -> np.ndarray | None:
+    """[0,1] mask over the largest detected face bbox (stats region)."""
+    faces = guard._app.get(img)
+    if not faces:
+        return None
+    f = max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
+    h, w = img.shape[:2]
+    m = np.zeros((h, w), np.float32)
+    x0, y0, x1, y1 = [int(v) for v in f.bbox]
+    m[max(0, y0):min(h, y1), max(0, x0):min(w, x1)] = 1.0
+    return m
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="bedhead", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -188,14 +201,20 @@ def main(argv: list[str] | None = None) -> int:
                     tier_b = None
             if args.auto_match:
                 # reference-guided autotune: one-shot suggestions at startup,
-                # then continuous ambient adaptation while the call runs
+                # then continuous ambient adaptation while the call runs.
+                # Stats are measured on FACE REGIONS only -- whole-frame stats
+                # misread a bright room behind a dimly-lit face.
                 from dataclasses import asdict
 
                 from .autotune import LookTracker, apply_autotune, autotune
 
                 live_sample = live_frames[-1] if live_frames else None
                 if live_sample is not None:
-                    at = autotune(live_sample, photo)
+                    live_face_mask = _face_bbox_mask(guard, live_sample)
+                    ref_face_mask = _face_bbox_mask(guard, photo)
+                    at = autotune(live_sample, photo,
+                                  live_face_mask=live_face_mask,
+                                  reference_face_mask=ref_face_mask)
                     for note in at.notes:
                         print(f"[bedhead] auto-match: {note}")
                     merged = apply_autotune(asdict(preset), at)
@@ -206,10 +225,10 @@ def main(argv: list[str] | None = None) -> int:
                     preset.color_match = max(preset.color_match, 0.8)
                     print(f"[bedhead] auto-match applied (color_match "
                           f"{preset.color_match:.2f}): {preset.describe()}")
-                    look_tracker = LookTracker(photo)
+                    look_tracker = LookTracker(photo, face_mask_fn=lambda: live_face_mask)
                     look_tracker.prime(live_sample)
                     print("[bedhead] auto-match: continuous mode on "
-                          "(ambient adaptation every ~2 s)")
+                          "(ambient adaptation every ~2 s, face-region stats)")
                     try:
                         preset.save(str(PRESET_PATH))
                     except OSError as e:

@@ -343,6 +343,24 @@ def apply(
         cv2.fillPoly(mask, [oval], 1.0)
         out = color_match(out, reference_bgr, s_color, face_mask=mask, _cache=_cm_cache)
 
+    # --- vibrance: chroma boost in LAB, L* preserved exactly.
+    # Webcams desaturate faces (measured: live face sat 67-69 vs reference 94).
+    # a*/b* are scaled up on dull pixels only (weight ~ 1/chroma), so vivid
+    # areas (lips, clothes) stay untouched while gray skin recovers -- and
+    # unlike an HSV saturation boost, LAB chroma scaling cannot shift luma.
+    s_vib = preset.scaled("vibrance")
+    if s_vib > 0:
+        lab = cv2.cvtColor(out, cv2.COLOR_BGR2LAB).astype(np.float32)
+        a = lab[..., 1] - 128.0
+        b = lab[..., 2] - 128.0
+        chroma = np.sqrt(a * a + b * b)
+        weight = np.power(np.clip(1.0 - chroma / 60.0, 0.0, 1.0), 1.5)
+        gain = 1.0 + 0.9 * s_vib * weight
+        lab[..., 1] = np.clip(a * gain + 128.0, 0, 255).astype(np.uint8)
+        lab[..., 2] = np.clip(b * gain + 128.0, 0, 255).astype(np.uint8)
+        lab[..., 0] = np.clip(lab[..., 0], 0, 255).astype(np.uint8)
+        out = cv2.cvtColor(lab.astype(np.uint8), cv2.COLOR_LAB2BGR)
+
     # --- soft light: global warm lift with highlight roll-off (LUT, O(1)).
     # Rolling lift (strongest in shadows, zero at white) closes dark-webcam
     # gaps without clipping highlights the way a flat additive would.
