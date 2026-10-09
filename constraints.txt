@@ -1,0 +1,14 @@
+# Constraints for every bedhead install (pip/uv: -c constraints.txt).
+#
+# WHY THIS FILE EXISTS (twice-bitten):
+# insightface depends on plain `opencv-python`, whose cv2 package SHADOWS
+# opencv-contrib-python when both are installed. bedhead requires the contrib
+# build (cv2.ximgproc.guidedFilter). Without this constraint, any fresh
+# `pip install -e .[dev]` can resolve opencv-python==5.x and break the retouch
+# pipeline with:
+#   AttributeError: module 'cv2.ximgproc' has no attribute 'guidedFilter'
+#
+# Fix if it ever happens:
+#   uv pip uninstall opencv-python opencv-contrib-python
+#   uv pip install opencv-contrib-python==4.14.0.94
+opencv-python<5
