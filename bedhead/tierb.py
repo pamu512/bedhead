@@ -112,7 +112,23 @@ class TierB:
         face = max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
 
         t0 = time.perf_counter()
-        swapped = self._swapper.get(frame_bgr, face, self._reference_face, paste_back=True)
+        # frequency-separable swap: low-freq identity from the generative
+        # render, high-freq native texture from RAW (the naive 0.5 blend was
+        # measured destroying skin detail below even RAW)
+        import cv2
+        from insightface.utils import face_align
+
+        from .freqblend import frequency_composite, paste_face
+
+        aimg, M = face_align.norm_crop2(frame_bgr, face.kps, 128)
+        swapped = self._swapper.get(frame_bgr, face, self._reference_face, paste_back=False)
+        if isinstance(swapped, tuple):
+            swapped = swapped[0]
+        if swapped.shape != aimg.shape:
+            swapped = cv2.resize(swapped, (aimg.shape[1], aimg.shape[0]),
+                                 interpolation=cv2.INTER_LINEAR)
+        composed = frequency_composite(aimg, swapped, blend=1.0)
+        swapped = paste_face(frame_bgr, composed, M)
         self.last_swap_ms = (time.perf_counter() - t0) * 1000
 
         # drift check every N frames (embedding of the swapped output vs ref)

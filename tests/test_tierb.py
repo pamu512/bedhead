@@ -13,9 +13,11 @@ def _unit(d=512, seed=0):
 
 
 class FakeFace:
-    def __init__(self, emb=None):
+    def __init__(self, emb=None, kps=None):
         self.bbox = np.array([10, 10, 100, 100], np.float32)
-        self.kps = np.zeros((5, 2), np.float32)
+        # sane 5-point kps (eyes, nose, mouth corners) for alignment geometry
+        self.kps = kps if kps is not None else np.array(
+            [[38, 48], [90, 48], [64, 72], [44, 96], [84, 96]], np.float32)
         self.normed_embedding = emb if emb is not None else _unit(3)
         self.det_score = 0.9
 
@@ -152,9 +154,9 @@ def test_blend_mixes_frames(setup):
     ref_img, ref_emb, guard = setup
     tb = _bare_tierb(guard)
     tb.set_reference(ref_img)
-    live = np.zeros((32, 32, 3), np.uint8)
+    live = np.zeros((128, 128, 3), np.uint8)
     guard.faces[id(live)] = [FakeFace(emb=ref_emb)]
-    swapped = np.full((32, 32, 3), 200, np.uint8)
+    swapped = np.full((128, 128, 3), 200, np.uint8)
     guard.embs[id(swapped)] = ref_emb
 
     class SwapperReturnsProto:
@@ -162,8 +164,10 @@ def test_blend_mixes_frames(setup):
             return swapped.copy()
 
     tb._swapper = SwapperReturnsProto()
-    tier_a = np.full((32, 32, 3), 100, np.uint8)
+    tier_a = np.full((128, 128, 3), 100, np.uint8)
     out, status = tb.process(live, tier_a, blend=0.5)
     assert status == "ok"
-    # 50/50 mix of 100 and 200 -> 150
-    assert abs(int(out[16, 16, 0]) - 150) <= 1
+    # frequency composite: low-freq (flat areas) takes the swap's value,
+    # high-freq texture from raw (none on flat frames); final blend mixes
+    # with tier_a at the face center: 0.5*(100) + 0.5*(200) = 150
+    assert abs(int(out[64, 64, 0]) - 150) <= 2
