@@ -11,7 +11,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import ttk
 
-from .config import Preset
+from .config import BACKGROUND_MODES, Preset
 
 PRESET_PATH = Path.home() / ".bedhead" / "preset.json"
 
@@ -38,6 +38,9 @@ class Panel(tk.Tk):
             ("teeth", "Teeth whitening"),
             ("hairline", "Hairline soften (exp.)"),
             ("soft_light", "Soft light"),
+            ("studio_light", "Studio light (person relight)"),
+            ("eye_light", "Eye light (awake)"),
+            ("background_strength", "Background strength"),
         )
         for name, label in rows:
             row = ttk.Frame(frm)
@@ -54,17 +57,33 @@ class Panel(tk.Tk):
 
         self.status = ttk.Label(frm, text="auto-saving to ~/.bedhead/preset.json", foreground="#7a4a3a")
         self.status.pack(anchor="w", pady=(14, 0))
+
+        bg_row = ttk.Frame(frm)
+        bg_row.pack(fill="x", pady=6)
+        ttk.Label(bg_row, text="Background mode", width=22).pack(side="left")
+        self.bg_mode_var = tk.StringVar(value=self.preset.background_mode)
+        self.bg_combo = ttk.Combobox(
+            bg_row, textvariable=self.bg_mode_var, state="readonly",
+            values=BACKGROUND_MODES, width=8,
+        )
+        self.bg_combo.pack(side="left", padx=(4, 0))
+        self.bg_combo.bind("<<ComboboxSelected>>", self._on_bg_mode)
+
         ttk.Button(frm, text="Reset to defaults", command=self._reset).pack(anchor="w", pady=8)
 
     def _load(self) -> None:
         if PRESET_PATH.exists():
             try:
                 self.preset = Preset.load(str(PRESET_PATH))
-            except Exception:  # noqa: BLE001
-                pass
+            except (OSError, ValueError, json.JSONDecodeError):
+                pass  # unreadable/partial preset: keep defaults, panel will overwrite
 
     def _on_slide(self, name: str) -> None:
         setattr(self.preset, name, float(self.vars[name].get()))
+        self._save()
+
+    def _on_bg_mode(self, _evt=None) -> None:
+        self.preset.background_mode = self.bg_mode_var.get()
         self._save()
 
     def _reset(self) -> None:
@@ -74,8 +93,7 @@ class Panel(tk.Tk):
         self._save()
 
     def _save(self) -> None:
-        PRESET_PATH.parent.mkdir(parents=True, exist_ok=True)
-        PRESET_PATH.write_text(json.dumps(self.preset.__dict__, indent=2))
+        self.preset.save(str(PRESET_PATH))
 
 
 if __name__ == "__main__":

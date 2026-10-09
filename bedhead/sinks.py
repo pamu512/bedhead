@@ -10,6 +10,19 @@ from __future__ import annotations
 import numpy as np
 
 
+def key_from_code(k: int) -> str | None:
+    """Map a cv2 waitKey return (already masked to 0xFF) to a character.
+
+    Esc (27) is reported as '\\x1b'; printable ASCII as itself; anything
+    else (including the 255 no-key sentinel) as None.
+    """
+    if k == 27:
+        return "\x1b"
+    if 32 <= k < 127:
+        return chr(k)
+    return None
+
+
 class PreviewWindow:
     """cv2 preview window with keyboard shortcuts (built before the Tk UI)."""
 
@@ -22,7 +35,6 @@ class PreviewWindow:
     def show(self, frame_bgr: np.ndarray, hud: str | None = None) -> str | None:
         import cv2
 
-        key = None
         if hud:
             frame = frame_bgr.copy()
             for i, line in enumerate(hud.splitlines()):
@@ -38,9 +50,7 @@ class PreviewWindow:
         else:
             cv2.imshow(self.name, frame_bgr)
         k = cv2.waitKey(1) & 0xFF
-        if k != 255:
-            key = chr(k) if 32 <= k < 127 else None
-        return key
+        return key_from_code(k)
 
     def close(self) -> None:
         import cv2

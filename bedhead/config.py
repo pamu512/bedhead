@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass, field, fields
+import os
+import tempfile
+from dataclasses import asdict, dataclass, fields
+from typing import Any
 
 
 @dataclass
@@ -17,32 +20,88 @@ class Preset:
     teeth: float = 0.35             # whiten inside inner lips when mouth is open
     hairline: float = 0.0           # EXPERIMENTAL: soften stray strands along hairline band
     soft_light: float = 0.25        # gentle exposure lift + warmth, NVIDIA-brightness style
-    show_original: bool = False     # A/B bypass (also bypasses virtual camera output)
+    studio_light: float = 0.0       # relight the person only (Apple Studio Light class)
+    eye_light: float = 0.0          # brighten eye region for an awake look
+    background_strength: float = 0.0  # blur/darken background (needs segmentation)
+    background_mode: str = "blur"   # "off" | "blur" | "dark"
+    show_original: bool = False     # A/B bypass (preview-only; virtual camera keeps retouched)
 
     def scaled(self, name: str) -> float:
         return max(0.0, min(1.0, getattr(self, name))) * max(0.0, min(1.0, self.intensity))
 
     def save(self, path: str) -> None:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(asdict(self), f, indent=2)
+        """Atomically write the preset so a concurrent reader never sees a torn file."""
+        d = os.path.dirname(path) or "."
+        os.makedirs(d, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=d, prefix=".preset.", suffix=".json")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(asdict(self), f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, path)
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
 
     @classmethod
-    def load(cls, path: str) -> "Preset":
+    def load(cls, path: str) -> Preset:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
+        if not isinstance(data, dict):
+            raise TypeError(f"preset file must contain a JSON object, got {type(data).__name__}")
         valid = {f.name for f in fields(cls)}
-        return cls(**{k: v for k, v in data.items() if k in valid})
+        kwargs: dict[str, Any] = {}
+        for k, v in data.items():
+            if k not in valid:
+                continue
+            if k == "show_original":
+                kwargs[k] = bool(v)
+            elif k == "background_mode":
+                mode = str(v).lower()
+                if mode not in ("off", "blur", "dark"):
+                    raise ValueError(f"background_mode must be off|blur|dark, got {v!r}")
+                kwargs[k] = mode
+            elif isinstance(v, bool) or not isinstance(v, (int, float)):
+                raise ValueError(f"preset field {k!r} must be a number, got {v!r}")
+            else:
+                kwargs[k] = float(v)
+        return cls(**kwargs)
 
     def describe(self) -> str:
+        bg = f"bg={self.background_mode}:{self.background_strength:.2f}" \
+            if self.background_strength > 0 else "bg=off"
         return (
             f"intensity={self.intensity:.2f} skin={self.skin:.2f} under_eye={self.under_eye:.2f} "
             f"shine={self.shine:.2f} teeth={self.teeth:.2f} hairline={self.hairline:.2f} "
-            f"soft_light={self.soft_light:.2f}"
+            f"soft_light={self.soft_light:.2f} studio={self.studio_light:.2f} "
+            f"eye_light={self.eye_light:.2f} {bg}"
         )
 
 
 # Named profiles used by the UI / CLI shortcuts.
-PRESETS: dict[str, dict[str, float]] = {
+PRESETS: dict[str, dict[str, Any]] = {
     "subtle": {"intensity": 0.4},
     "rescue": {"intensity": 0.8},
+    "studio": {
+        "intensity": 0.5,
+        "soft_light": 0.2,
+        "studio_light": 0.6,
+        "eye_light": 0.4,
+        "background_strength": 0.85,
+        "background_mode": "blur",
+    },
+    "focus": {
+        "intensity": 0.35,
+        "background_strength": 0.9,
+        "background_mode": "dark",
+    },
 }
+
+
+# Background modes accepted by Preset.background_mode (kept in one place for
+# the panel combobox and load-time validation).
+BACKGROUND_MODES = ("off", "blur", "dark")

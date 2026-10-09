@@ -8,13 +8,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-import numpy as np
-
 import mediapipe as mp
+import numpy as np
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision
 
 from .models import ensure_models
+from .quality import OneEuro, Schmitt
 
 # ---------------------------------------------------------------- region indices
 # MediaPipe FaceMesh canonical topology (see editor.pixees.artifacts / mediapipe docs).
@@ -33,10 +33,6 @@ LEFT_BROW = (70, 63, 105, 66, 107, 55, 65, 52, 53, 46)
 RIGHT_BROW = (300, 293, 334, 296, 313, 276, 283, 282, 295, 285)
 OUTER_LIPS = (61, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146)
 INNER_LIPS = (78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14)
-FOREHEAD_BAND = (10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378,
-                 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21,
-                 54, 103, 67, 109)  # placeholder: replaced by dynamic band below
-
 # Landmarks whose neighborhood is treated as "skin" for tone stats.
 CHEEK_SAMPLES = (
     50, 101, 119, 36, 205, 58, 355, 465, 340, 326, 316,  448,  465, 330, 349,
@@ -50,7 +46,6 @@ class FaceFrame:
     """Everything the retoucher needs for one video frame."""
 
     landmarks: np.ndarray            # (478, 3) image-pixel coords
-    score: float                     # presence score 0..1
     h: int
     w: int
     extras: dict = field(default_factory=dict)
@@ -59,25 +54,12 @@ class FaceFrame:
         """Landmark indices -> int32 polygon for cv2.fillPoly."""
         return np.round(self.landmarks[list(idx), :2]).astype(np.int32)
 
-    def box(self, idx: tuple[int, ...], pad: float = 0.0) -> tuple[int, int, int, int]:
-        pts = self.landmarks[list(idx), :2]
-        x0, y0 = pts.min(axis=0)
-        x1, y1 = pts.max(axis=0)
-        if pad:
-            cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
-
-            def p(v, c, s):  # pad relative to box size
-                return int(v - (c - v) * (1 + pad * s))
-
-            x0, y0, x1, y1 = p(x0, cx, 1), p(y0, cy, 1), p(x1, cx, 1), p(y1, cy, 1)
-        return int(x0), int(y0), int(x1), int(y1)
-
 
 class FaceTracker:
     """Wraps MediaPipe FaceLandmarker in VIDEO mode with 1 face."""
 
     def __init__(self, num_faces: int = 1) -> None:
-        paths = ensure_models()
+        paths = ensure_models({"face_landmarker.task"})
         base = mp_python.BaseOptions(model_asset_path=str(paths["face_landmarker.task"]))
         opts = vision.FaceLandmarkerOptions(
             base_options=base,
@@ -88,6 +70,10 @@ class FaceTracker:
             output_facial_transformation_matrixes=False,
         )
         self._landmarker = vision.FaceLandmarker.create_from_options(opts)
+        # temporal quality: one-euro on the 478 (x, y) landmarks, hysteresis on
+        # the jaw-open gate so the teeth effect never flickers at half-open.
+        self._euro = OneEuro(478, freq=30.0, min_cutoff=1.2, beta=0.02)
+        self._jaw_gate = Schmitt(hi=0.30, lo=0.18)
 
     def detect(self, frame_bgr: np.ndarray, timestamp_ms: int) -> FaceFrame | None:
         rgb = frame_bgr[:, :, ::-1]  # MediaPipe expects RGB
@@ -99,7 +85,9 @@ class FaceTracker:
             return None
         h, w = frame_bgr.shape[:2]
         pts = np.array([[p.x * w, p.y * h, p.z] for p in lms[0]], dtype=np.float32)
-        score = float(np.mean([p.visibility if p.visibility is not None else 1.0 for p in lms[0]]))
+        # temporal smoothing: one-euro on x, y only (z is unused downstream)
+        smoothed = self._euro(pts[:, :2].copy())
+        pts[:, :2] = smoothed
         extras: dict = {}
         bs = getattr(result, "face_blendshapes", None)
         if bs:
@@ -107,7 +95,9 @@ class FaceTracker:
             extras["jaw_open"] = categories.get("jawOpen", 0.0)
             extras["eye_blink_left"] = categories.get("eyeBlinkLeft", 0.0)
             extras["eye_blink_right"] = categories.get("eyeBlinkRight", 0.0)
-        return FaceFrame(landmarks=pts, score=score, h=h, w=w, extras=extras)
+            extras["jaw_open_gated"] = 1.0 if self._jaw_gate(
+                categories.get("jawOpen", 0.0)) else 0.0
+        return FaceFrame(landmarks=pts, h=h, w=w, extras=extras)
 
     def close(self) -> None:
         self._landmarker.close()

@@ -2,12 +2,23 @@
 name = "bedhead"
 version = "0.1.0"
 description = "Bed Head - look presentable on video calls. P0 spike: Tier A mesh-aware retouch pipeline."
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10,<3.14"
 dependencies = [
     "mediapipe>=0.10.14",
-    "opencv-contrib-python>=4.9",
+    "opencv-contrib-python>=4.9,<5",
     "numpy>=1.26",
     "pyvirtualcam>=0.11",
+]
+
+[project.optional-dependencies]
+mac-names = ["pyobjc-framework-AVFoundation>=10.0"]
+test = ["pytest>=8"]
+# insightface drags in plain opencv-python, whose cv2 shadows the contrib build
+# bedhead needs (ximgproc). Pin the contrib build explicitly after it.
+guard = [
+    "insightface>=0.7.3",
+    "onnxruntime>=1.17",
+    "opencv-contrib-python>=4.9,<5",
 ]
 
 [project.scripts]
@@ -19,3 +30,11 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["bedhead"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "live_camera: tests that need a real webcam (deselected by default; run with -m live_camera)",
+    "guard_model: tests needing the real insightface model + fixtures (deselected by default)",
+]
+addopts = "-m 'not live_camera and not guard_model'"

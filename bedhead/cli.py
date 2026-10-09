@@ -8,29 +8,56 @@
   bedhead --list-cameras
 
 Keys (preview window):
-  q/Esc quit · space toggle original/retouched · 0-9 set intensity
+  q/Esc quit · space toggle original/retouched (preview only; the virtual
+  camera always receives the retouched frame) · 0-9 set intensity
   s skin · e under-eye · h shine · t teeth · l soft-light (each +0.1, wrap)
+
+Keyboard edits are persisted to ~/.bedhead/preset.json so the Tk panel and
+the CLI share one source of truth.
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 import time
+from dataclasses import replace
+from pathlib import Path
 
 import cv2
 import numpy as np
 
 from . import __version__
-from .config import PRESETS, Preset
+from .config import BACKGROUND_MODES, PRESETS, Preset
+from .guard import LIVE_SAMPLES, IdentityGuard
 from .retoucher import apply
+from .segmenter import Segmenter
 from .sinks import PreviewWindow, VirtualCamSink
 from .tracker import FaceTracker
+
+PRESET_PATH = Path.home() / ".bedhead" / "preset.json"
+MAX_CONSECUTIVE_READ_FAILURES = 100  # ~5 s of retries before giving up
+
+
+def _camera_names() -> dict[int, str]:
+    """Best-effort human-readable camera names (macOS: AVFoundation via pyobjc)."""
+    if sys.platform == "darwin":
+        try:
+            import AVFoundation
+
+            devices = AVFoundation.AVCaptureDevice.devicesWithMediaType_(
+                AVFoundation.AVMediaTypeVideo
+            )
+            return {i: str(d.localizedName()) for i, d in enumerate(devices)}
+        except (ImportError, AttributeError, RuntimeError):
+            # pyobjc optional; probing fallback used below
+            pass
+    return {}
 
 
 def list_cameras() -> None:
     print("Probing cameras 0..5 (something must be readable to confirm)...")
+    names = _camera_names()
     found = []
     for i in range(6):
         cap = cv2.VideoCapture(i)
@@ -42,7 +69,8 @@ def list_cameras() -> None:
     if not found:
         print("No cameras found.")
     for i, w, h in found:
-        print(f"  /dev/video{i} (index {i}): {w}x{h}")
+        label = names.get(i, f"camera {i}")
+        print(f"  [{i}] {label}: {w}x{h}")
     print("Use --camera <index> to pick one.")
 
 
@@ -55,7 +83,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--fps", type=int, default=30)
     ap.add_argument("--cam", action="store_true", help="enable virtual camera output")
     ap.add_argument("--no-preview", action="store_true", help="disable preview window")
-    ap.add_argument("--preset", default=None, help="named preset (subtle|rescue) or JSON path")
+    ap.add_argument("--preset", default=None, help="named preset (subtle|rescue|studio|focus) or JSON path")
+    ap.add_argument("--reference", default=None, metavar="PHOTO",
+                    help="reference photo for identity-guarded features (gallery upload OK; "
+                         "must match the face on camera to be used)")
     ap.add_argument("--list-cameras", action="store_true")
     ap.add_argument("--version", action="version", version=f"bedhead {__version__}")
     args = ap.parse_args(argv)
@@ -86,6 +117,67 @@ def main(argv: list[str] | None = None) -> int:
 
     tracker = FaceTracker()
 
+    # --- reference photo admission (gallery upload allowed, identity-gated) ---
+    reference_embedding = None
+    if args.reference:
+        photo = cv2.imread(args.reference)
+        if photo is None:
+            print(f"[bedhead] could not read reference photo {args.reference}", file=sys.stderr)
+            return 2
+        try:
+            guard = IdentityGuard()
+        except RuntimeError as e:
+            print(f"[bedhead] {e}", file=sys.stderr)
+            return 2
+        ref_emb = guard.embed(photo)
+        if ref_emb is None:
+            print("[bedhead] no face found in the reference photo; "
+                  "pick a clear, front-facing shot.", file=sys.stderr)
+            return 2
+        print(f"[bedhead] sampling {LIVE_SAMPLES} live frames to check the reference "
+              f"matches the face on camera ...")
+        live_embs: list[np.ndarray] = []
+        attempts = 0
+        while len(live_embs) < LIVE_SAMPLES and attempts < LIVE_SAMPLES * 6:
+            attempts += 1
+            ok, frame = cap.read()
+            if not ok:
+                time.sleep(0.05)
+                continue
+            if frame.shape[:2] != (args.height, args.width):
+                frame = cv2.resize(frame, (args.width, args.height))
+            e = guard.embed(frame)
+            if e is not None:
+                live_embs.append(e)
+        result = guard.admit(ref_emb, live_embs)
+        if not result.admitted:
+            print(f"[bedhead] reference rejected: {result.reason}", file=sys.stderr)
+            print("[bedhead] continuing WITHOUT the reference (Tier A only).", file=sys.stderr)
+        else:
+            reference_embedding = ref_emb
+            print(f"[bedhead] reference admitted: {result.reason}")
+    del reference_embedding  # Tier B will consume it; not used by Tier A effects
+
+    segmenter: Segmenter | None = None
+
+    def _seg_wanted(p: Preset) -> bool:
+        return (p.background_strength > 0 and p.background_mode != "off") or p.studio_light > 0
+
+    def _get_segmenter() -> Segmenter | None:
+        """Lazily construct the segmenter (downloads model on first use)."""
+        nonlocal segmenter
+        if not _seg_wanted(preset):
+            return None
+        if segmenter is None:
+            try:
+                segmenter = Segmenter()
+                print("[bedhead] segmentation active (person masks for background/studio light)")
+            except Exception as e:  # noqa: BLE001 - degrade to no segmentation
+                print(f"[bedhead] segmentation unavailable ({e.__class__.__name__}: {e}); "
+                      "background/studio-light disabled this run.")
+                return None
+        return segmenter
+
     vcam: VirtualCamSink | None = None
     if args.cam:
         try:
@@ -99,33 +191,63 @@ def main(argv: list[str] | None = None) -> int:
     if not args.no_preview:
         preview = PreviewWindow()
 
-    print("[bedhead] running. Keys: q quit · space A/B · 0-9 intensity · "
-          "s/e/h/t/l effect dials")
+    if vcam is None and preview is None:
+        print("[bedhead] no output sink available (virtual camera failed, preview disabled); "
+              "nothing to do.", file=sys.stderr)
+        cap.release()
+        tracker.close()
+        return 1
+
+    print("[bedhead] running. Keys: q/Esc quit · space A/B · 0-9 intensity · "
+          "s/e/h/t/l dials · k studio · i eye-light · b bg strength · n bg mode")
 
     # FPS stats + panel hot-reload (edits from bedhead.panel land within ~1 s)
-    from pathlib import Path as _P
-    _preset_path = _P.home() / ".bedhead" / "preset.json"
     _preset_mtime: float = 0.0
+    if PRESET_PATH.exists():
+        _preset_mtime = PRESET_PATH.stat().st_mtime
     t_last = time.perf_counter()
     t_reload = t_last
     fps_ema = 0.0
     proc_ms_ema = 0.0
     frame_i = 0
-    cache: dict = {}
+    read_failures = 0
+    key: str | None = None
+
+    def persist() -> None:
+        """Save keyboard edits so the panel sees them; bump mtime to skip self-reload."""
+        nonlocal _preset_mtime
+        try:
+            preset.save(str(PRESET_PATH))
+            _preset_mtime = PRESET_PATH.stat().st_mtime
+        except OSError as e:
+            print(f"[bedhead] could not save preset: {e}")
 
     try:
         while True:
             ok, frame = cap.read()
             if not ok:
-                print("[bedhead] camera read failed; retrying...")
+                read_failures += 1
+                if read_failures >= MAX_CONSECUTIVE_READ_FAILURES:
+                    print(f"[bedhead] camera {args.camera} produced {read_failures} consecutive "
+                          "read failures; exiting.", file=sys.stderr)
+                    return 1
                 time.sleep(0.05)
                 continue
+            read_failures = 0
             if frame.shape[1] != args.width or frame.shape[0] != args.height:
                 frame = cv2.resize(frame, (args.width, args.height))
 
             t0 = time.perf_counter()
             face = tracker.detect(frame, frame_i * 1000 // max(args.fps, 1))
-            out = apply(frame, face, preset, cache)
+            seg = _get_segmenter()
+            if seg is not None:
+                seg.tick(frame, frame_i * 1000 // max(args.fps, 1))
+            # A/B is preview-only: the virtual camera always gets the retouched
+            # frame, so toggling it mid-call can never leak the unretouched feed.
+            effect_preset = preset if not preset.show_original else replace(
+                preset, show_original=False
+            )
+            out = apply(frame, face, effect_preset, segmenter=seg)
             proc_ms = (time.perf_counter() - t0) * 1000
             proc_ms_ema = proc_ms if frame_i == 0 else proc_ms_ema * 0.9 + proc_ms * 0.1
 
@@ -133,13 +255,15 @@ def main(argv: list[str] | None = None) -> int:
                 vcam.send(out)
 
             if preview is not None:
+                shown = frame if preset.show_original else out
                 hud = (
                     f"bedhead {__version__} | {fps_ema:5.1f} fps | track+retouch {proc_ms_ema:4.1f} ms"
                     f" | face {'LOST (passthrough)' if face is None else 'ok'}"
+                    f" | {'A/B: ORIGINAL (preview only)' if preset.show_original else ''}"
                     f" | {preset.describe()}"
                 )
-                key = preview.show(out, hud=hud)
-                if key in ("q", "\x1b", "Q"):
+                key = preview.show(shown, hud=hud)
+                if key in ("q", "Q", "\x1b"):
                     break
                 if key == " ":
                     preset.show_original = not preset.show_original
@@ -155,19 +279,32 @@ def main(argv: list[str] | None = None) -> int:
                     preset.teeth = (preset.teeth + 0.1) % 1.1
                 elif key in ("l", "L"):
                     preset.soft_light = (preset.soft_light + 0.1) % 1.1
+                elif key in ("b", "B"):
+                    preset.background_strength = (preset.background_strength + 0.2) % 1.2
+                elif key in ("k", "K"):
+                    preset.studio_light = (preset.studio_light + 0.1) % 1.1
+                elif key in ("i", "I"):
+                    preset.eye_light = (preset.eye_light + 0.1) % 1.1
+                elif key in ("n", "N"):
+                    modes = BACKGROUND_MODES
+                    preset.background_mode = modes[(modes.index(preset.background_mode) + 1) % len(modes)]
+                else:
+                    key = None
+                if key is not None:
+                    persist()
 
             # housekeeping
             now = time.perf_counter()
-            if now - t_reload > 1.0 and _preset_path.exists():
+            if now - t_reload > 1.0 and PRESET_PATH.exists():
                 t_reload = now
-                mtime = _preset_path.stat().st_mtime
+                mtime = PRESET_PATH.stat().st_mtime
                 if mtime != _preset_mtime:
                     _preset_mtime = mtime
                     try:
-                        preset = Preset.load(str(_preset_path))
+                        preset = Preset.load(str(PRESET_PATH))
                         print(f"[bedhead] preset reloaded: {preset.describe()}")
-                    except Exception:  # noqa: BLE001
-                        pass
+                    except Exception as e:  # noqa: BLE001
+                        print(f"[bedhead] preset reload failed ({e}); keeping current preset")
             inst = 1.0 / max(now - t_last, 1e-6)
             fps_ema = inst if frame_i == 0 else fps_ema * 0.9 + inst * 0.1
             t_last = now
@@ -180,6 +317,8 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         cap.release()
         tracker.close()
+        if segmenter is not None:
+            segmenter.close()
         if vcam is not None:
             vcam.close()
         if preview is not None:
