@@ -293,6 +293,7 @@ def apply(
     preset: Preset,
     segmenter: Segmenter | None = None,
     reference_bgr: np.ndarray | None = None,
+    _cm_cache: dict | None = None,
 ) -> np.ndarray:
     """Main entry: returns the retouched (or passthrough) frame.
 
@@ -340,7 +341,7 @@ def apply(
         h, w = out.shape[:2]
         mask = np.zeros((h, w), np.float32)
         cv2.fillPoly(mask, [oval], 1.0)
-        out = color_match(out, reference_bgr, s_color, face_mask=mask)
+        out = color_match(out, reference_bgr, s_color, face_mask=mask, _cache=_cm_cache)
 
     # --- soft light: global warm lift with highlight roll-off (LUT, O(1)).
     # Rolling lift (strongest in shadows, zero at white) closes dark-webcam

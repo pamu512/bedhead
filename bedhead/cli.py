@@ -123,6 +123,7 @@ def main(argv: list[str] | None = None) -> int:
     tracker = FaceTracker()
     look_tracker: LookTracker | None = None  # set when --auto-match is admitted
     reference_img: np.ndarray | None = None  # the admitted reference photo
+    cm_cache: dict = {}  # reference-stats cache for color_match (per run)
 
     # --- reference photo admission (gallery upload allowed, identity-gated) ---
     if args.reference:
@@ -309,7 +310,7 @@ def main(argv: list[str] | None = None) -> int:
                 preset, show_original=False
             )
             out = apply(frame, face, effect_preset, segmenter=seg,
-                        reference_bgr=reference_img)
+                        reference_bgr=reference_img, _cm_cache=cm_cache)
             # clothes tidy-up + logo blur run on the retouched frame
             cseg = _get_clothes()
             if cseg is not None and (preset.clothes > 0 or preset.stain > 0 or preset.logo_blur > 0):
