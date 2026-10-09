@@ -307,6 +307,7 @@ def main(argv: list[str] | None = None) -> int:
     frame_i = 0
     read_failures = 0
     key: str | None = None
+    show_reference_pip = False  # 'r' toggles reference picture-in-picture
 
     def persist() -> None:
         """Save keyboard edits so the panel sees them; bump mtime to skip self-reload."""
@@ -368,6 +369,23 @@ def main(argv: list[str] | None = None) -> int:
 
             if preview is not None:
                 shown = frame if preset.show_original else out
+                if show_reference_pip and reference_img is not None:
+                    # reference picture-in-picture (top-right, 320px wide)
+                    pw = 320
+                    ph = int(pw * reference_img.shape[0] / reference_img.shape[1])
+                    thumb = cv2.resize(reference_img, (pw, ph))
+                    shown = shown.copy()
+                    y0p, x0p = 12, shown.shape[1] - pw - 12
+                    roi = shown[y0p:y0p + ph, x0p:x0p + pw]
+                    shown[y0p:y0p + ph, x0p:x0p + pw] = cv2.addWeighted(roi, 0.25, thumb, 0.75, 0)
+                    cv2.rectangle(shown, (x0p - 2, y0p - 2),
+                                  (x0p + pw + 2, y0p + ph + 2), (180, 180, 180), 2)
+                    cv2.putText(shown, "REFERENCE", (x0p + 8, y0p + 24), 3, 0.6,
+                                (255, 255, 255), 2)
+                if tier_b is not None:
+                    shown = shown.copy()
+                    cv2.putText(shown, f"TIER B blend {tier_b_blend:.2f}", (12, shown.shape[0] - 14),
+                                3, 0.6, (0, 255, 0), 2)
                 hud = (
                     f"bedhead {__version__} | {fps_ema:5.1f} fps | track+retouch {proc_ms_ema:4.1f} ms"
                     f" | face {'LOST (passthrough)' if face is None else 'ok'}"
@@ -395,6 +413,8 @@ def main(argv: list[str] | None = None) -> int:
                     preset.color_match = (preset.color_match + 0.2) % 1.2
                 elif key in ("g", "G"):
                     tier_b_blend = (tier_b_blend + 0.25) % 1.25 if tier_b is not None else 0.0
+                elif key in ("r", "R"):
+                    show_reference_pip = not show_reference_pip
                 elif key in ("b", "B"):
                     preset.background_strength = (preset.background_strength + 0.2) % 1.2
                 elif key in ("k", "K"):

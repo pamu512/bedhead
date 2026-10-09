@@ -23,6 +23,10 @@ guard = [
 dev = [
     "pytest",
     "pyyaml",
+    "insightface>=0.7.3",
+    "onnxruntime>=1.17",
+    # keep contrib last so its cv2 wins over plain opencv-python (insightface dep)
+    "opencv-contrib-python>=4.9,<5",
 ]
 
 [project.scripts]

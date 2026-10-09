@@ -46,6 +46,8 @@ class TierB:
         self._reference_embedding: np.ndarray | None = None
         self._last_drift_sim = 1.0
         self._frames_since_check = 0
+        self._drift_strikes = 0
+        self._blend_scale = 1.0  # progressive fail-safe multiplier on blend
         self._disabled_reason: str | None = None
         self.last_swap_ms = 0.0
 
@@ -133,6 +135,7 @@ class TierB:
 
         # drift check every N frames (embedding of the swapped output vs ref)
         self._frames_since_check += 1
+        blend_now = float(np.clip(blend, 0.0, 1.0)) * self._blend_scale
         if self._frames_since_check >= DRIFT_CHECK_INTERVAL:
             self._frames_since_check = 0
             emb = self.guard.embed(swapped)
@@ -141,14 +144,27 @@ class TierB:
             sim = float(np.dot(self._reference_embedding, emb))
             self._last_drift_sim = sim
             if sim < DRIFT_CAP:
-                self._disabled_reason = f"drift {sim:.3f} < {DRIFT_CAP}"
-                return tier_a_out, f"disabled:{self._disabled_reason}"
+                # progressive fail-safe: halve the blend (toward Tier A) on
+                # each violation; full-disable only after repeated strikes
+                self._drift_strikes += 1
+                self._blend_scale = max(0.125, self._blend_scale / 2.0)
+                blend_now = float(np.clip(blend, 0.0, 1.0)) * self._blend_scale
+                if self._drift_strikes >= 3:
+                    self._disabled_reason = (
+                        f"drift {sim:.3f} < {DRIFT_CAP} x{self._drift_strikes}"
+                    )
+                    return tier_a_out, f"disabled:{self._disabled_reason}"
+                if blend_now <= 0:
+                    return tier_a_out, (
+                        f"drift:sim {sim:.2f}, Tier B blend cut to {self._blend_scale:.2f}x"
+                    )
+            else:
+                self._drift_strikes = 0
 
-        b = float(np.clip(blend, 0.0, 1.0))
-        if b >= 0.999:
+        if blend_now >= 0.999:
             return swapped, "ok"
         mixed = (
-            tier_a_out.astype(np.float32) * (1 - b) + swapped.astype(np.float32) * b
+            tier_a_out.astype(np.float32) * (1 - blend_now) + swapped.astype(np.float32) * blend_now
         ).astype(np.uint8)
         return mixed, "ok"
 

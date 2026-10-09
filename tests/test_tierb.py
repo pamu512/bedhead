@@ -56,6 +56,8 @@ def _bare_tierb(guard) -> TierB:
     tb._reference_embedding = None
     tb._disabled_reason = None
     tb._frames_since_check = 0
+    tb._drift_strikes = 0
+    tb._blend_scale = 1.0
     tb._last_drift_sim = 1.0
     tb.last_swap_ms = 0.0
     tb._model_path = ""
@@ -107,14 +109,18 @@ def test_drift_cap_disables_tier_b(setup):
 
     tb._swapper = SwapperReturnsProto()
 
-    status = "ok"
     for _ in range(DRIFT_CHECK_INTERVAL + 1):
-        _out, status = tb.process(live, live, blend=1.0)
-    assert status.startswith("disabled"), status
+        _out, _st = tb.process(live, live, blend=1.0)
+    # progressive fail-safe: first strike cut the blend (blend_scale 0.5);
+    # per-frame status stays "ok" because the reduced blend still renders
+    assert tb._drift_strikes >= 1 and tb._blend_scale < 1.0
+    # keep violating: three strikes disable Tier B for the run
+    for _ in range(DRIFT_CHECK_INTERVAL * 2 + 1):
+        _o, status2 = tb.process(live, live, blend=1.0)
+    assert status2.startswith("disabled"), status2
     assert tb.disabled_reason is not None and "drift" in tb.disabled_reason
-    # after disable: further calls pass through no matter what
-    out2, status2 = tb.process(live, live, blend=1.0)
-    assert status2.startswith("disabled") and out2 is live
+    out3, status3 = tb.process(live, live, blend=1.0)
+    assert status3.startswith("disabled") and out3 is live
 
 
 def test_good_identity_keeps_running(setup):
