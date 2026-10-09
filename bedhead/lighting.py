@@ -46,6 +46,27 @@ def background_darken(
     return cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
 
 
+def face_lift(
+    frame: np.ndarray, face_mask: np.ndarray, strength: float,
+) -> np.ndarray:
+    """Raise face-region L* by up to ~35 levels, feathered, highlight-rolled.
+
+    Closes the 'dim room vs reference lighting' exposure gap soft_light
+    can't reach: soft_light is global (lifts background too, fighting the
+    subject pop), this touches only the face oval. Rolling lift: strongest
+    in shadows, zero at white, so highlights never clip.
+    """
+    if strength <= 0:
+        return frame
+    lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+    lf = lab[..., 0].astype(np.float32)
+    lifted = lf + (250.0 - lf) * 0.35 * strength
+    a = face_mask * strength
+    out_l = lf * (1 - a) + lifted * a
+    lab[..., 0] = np.clip(out_l, 0, 255).astype(np.uint8)
+    return cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+
+
 def studio_light(frame: np.ndarray, person_mask: np.ndarray, strength: float) -> np.ndarray:
     """Relight the person only: soft luminance lift + slight warmth, feathered.
 

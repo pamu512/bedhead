@@ -24,7 +24,13 @@ import numpy as np
 
 from .colormatch import color_match
 from .config import Preset
-from .lighting import background_darken, background_mode, eye_light, studio_light
+from .lighting import (
+    background_darken,
+    background_mode,
+    eye_light,
+    face_lift,
+    studio_light,
+)
 from .quality import unsharp_detail
 from .segmenter import Segmenter
 from .tracker import (
@@ -374,6 +380,13 @@ def apply(
     # --- eye light (landmark-driven, no segmentation needed)
     if preset.eye_light > 0 and face is not None:
         out = eye_light(out, face.landmarks, preset.scaled("eye_light"))
+
+    # --- face lift: close the exposure gap soft_light can't (global lifts
+    # fight the subject pop); face-oval only, highlight-rolled
+    if preset.face_lift > 0 and face is not None:
+        fm = (_feather(_mask_poly(face.h, face.w, face.poly(FACE_OVAL)), 31)
+              .astype(np.float32) / 255.0)
+        out = face_lift(out, fm, preset.scaled("face_lift"))
 
     # --- face effects (need a tracked face)
     if face is not None and preset.intensity > 0:

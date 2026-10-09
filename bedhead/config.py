@@ -47,6 +47,7 @@ class Preset:
     studio_light: float = 0.0       # relight the person only (Apple Studio Light class)
     background_darken: float = 0.0  # darken background for subject pop
     detail_boost: float = 0.0       # face-region unsharp (webcams are soft)
+    face_lift: float = 0.0          # face-oval exposure lift (dim-room closer)
     eye_light: float = 0.0          # brighten eye region for an awake look
     background_strength: float = 0.0  # blur/darken background (needs segmentation)
     background_mode: str = "blur"   # "off" | "blur" | "dark"

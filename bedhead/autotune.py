@@ -161,7 +161,7 @@ def apply_autotune(base_preset_dict: dict, result: AutotuneResult) -> dict:
 # ---------------------------------------------------------------------
 
 # Fields the continuous tracker may adapt (ambient-driven, never taste keys).
-CONTINUOUS_FIELDS = ("soft_light", "studio_light", "background_darken")
+CONTINUOUS_FIELDS = ("soft_light", "studio_light", "background_darken", "face_lift")
 
 
 class LookTracker:
@@ -181,8 +181,9 @@ class LookTracker:
         deadband: float = 0.03,
         face_mask_fn=None,
         face_fn=None,  # () -> FaceFrame | None, for under-eye band measurement
+        ref_face_mask=None,  # [0,1] mask of the reference's face region
     ) -> None:
-        self._ref_stats = _stats(reference_bgr)
+        self._ref_stats = _stats(reference_bgr, ref_face_mask)
         self.interval = interval_s
         self.ema = ema            # weight of the NEW suggestion per cycle
         self.deadband = deadband  # ignore suggested deltas below this
@@ -239,6 +240,9 @@ class LookTracker:
         out["soft_light"] = _clamp01(dL / 20.0)
         if dL < 0:
             out["soft_light"] = 0.0
+        # face lift: exposure gap beyond soft_light's +20 range, applied to
+        # the face only (a global lift would fight the subject pop)
+        out["face_lift"] = _clamp01(max(0.0, dL - 18.0) / 35.0)
         if d_warm > 3:
             out["studio_light"] = _clamp01(d_warm / 30.0)
         else:

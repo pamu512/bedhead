@@ -228,7 +228,8 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"[bedhead] auto-match applied (color_match "
                           f"{preset.color_match:.2f}): {preset.describe()}")
                     look_tracker = LookTracker(photo, face_mask_fn=lambda: live_face_mask,
-                                               face_fn=lambda: face)
+                                               face_fn=lambda: face,
+                                               ref_face_mask=ref_face_mask)
                     look_tracker.prime(live_sample)
                     print("[bedhead] auto-match: continuous mode on "
                           "(ambient adaptation every ~2 s, face-region stats)")

@@ -65,7 +65,7 @@ def test_deadband_suppresses_micro_changes():
 def test_only_ambient_fields_touched():
     lt = LookTracker(_img(150, b_chroma=50), interval_s=1.0)
     lt.prime(_img(90))
-    assert set(lt.current) == {"soft_light", "studio_light", "background_darken"}
+    assert set(lt.current) == {"soft_light", "studio_light", "background_darken", "face_lift"}
     assert lt.current["studio_light"] > 0.0
 
 
