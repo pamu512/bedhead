@@ -79,15 +79,18 @@ def under_eye_mask(face: FaceFrame) -> np.ndarray:
     """
     h, w = face.h, face.w
     band = np.zeros((h, w), np.uint8)
+    lid_gap = None
     for ring in (LEFT_EYE_RING, RIGHT_EYE_RING):
         pts = face.landmarks[list(ring), :2].astype(np.float32)
         ew = float(pts[:, 0].max() - pts[:, 0].min()) + 1e-6
+        # start BELOW the lash line (~12% of eye width): the hull-top sitting
+        # on the bright lower lid read L* 157 vs cheek 141 (over-lift at the
+        # lid edge) while the trough below stayed darkest
+        lid_gap = max(2.0, ew * 0.12)
         drop = max(4.0, ew * 0.45)
-        shifted = pts + np.array([0.0, drop], np.float32)
-        # hull of the eye + its shifted copy cannot self-intersect; the
-        # vstacked-arc quad built before fused across the midline and ran
-        # to the frame bottom
-        both = np.vstack([pts, shifted])
+        shifted = pts + np.array([0.0, lid_gap + drop], np.float32)
+        pts_low = pts + np.array([0.0, lid_gap], np.float32)
+        both = np.vstack([pts_low, shifted])
         hull = cv2.convexHull(both.reshape(-1, 1, 2)).astype(np.int32)
         cv2.fillPoly(band, [hull], 255)
     band = cv2.subtract(band, _mask_poly(h, w, face.poly(LEFT_EYE_RING)))
@@ -319,10 +322,12 @@ def _apply_face_effects(
         extras=face.extras,
     )
     skin_refine = None
-    if seg_skin is not None:
+    if seg_skin is not None and seg_skin.size and seg_skin.shape[:2] == out.shape[:2]:
         skin_refine = seg_skin[y0:y1 + 1, x0:x1 + 1].astype(np.float32)
-        if skin_refine.shape[:2] != roi.shape[:2]:
+        if skin_refine.size and skin_refine.shape[:2] != roi.shape[:2]:
             skin_refine = cv2.resize(skin_refine, (roi.shape[1], roi.shape[0]))
+        if not skin_refine.size:
+            skin_refine = None
     out[y0:y1 + 1, x0:x1 + 1] = _retouch_roi(roi, shifted, preset, skin_refine)
     return out
 
@@ -391,17 +396,30 @@ def apply(
     # areas (lips, clothes) stay untouched while gray skin recovers -- and
     # unlike an HSV saturation boost, LAB chroma scaling cannot shift luma.
     s_vib = preset.scaled("vibrance")
-    if s_vib > 0:
-        lab = cv2.cvtColor(out, cv2.COLOR_BGR2LAB).astype(np.float32)
-        a = lab[..., 1] - 128.0
-        b = lab[..., 2] - 128.0
-        chroma = np.sqrt(a * a + b * b)
-        weight = np.power(np.clip(1.0 - chroma / 60.0, 0.0, 1.0), 1.5)
-        gain = 1.0 + 0.9 * s_vib * weight
-        lab[..., 1] = np.clip(a * gain + 128.0, 0, 255).astype(np.uint8)
-        lab[..., 2] = np.clip(b * gain + 128.0, 0, 255).astype(np.uint8)
-        lab[..., 0] = np.clip(lab[..., 0], 0, 255).astype(np.uint8)
-        out = cv2.cvtColor(lab.astype(np.uint8), cv2.COLOR_LAB2BGR)
+    if s_vib > 0 and face is not None:
+        # ROI-restricted: full-frame LAB round-trips cost ~7 ms/frame; the
+        # bench metric (and the look) is the face. Feathered oval mask.
+        oval = _mask_poly(face.h, face.w, face.poly(FACE_OVAL))
+        x0 = max(0, int(face.landmarks[list(FACE_OVAL), 0].min()) - 8)
+        x1 = min(face.w, int(face.landmarks[list(FACE_OVAL), 0].max()) + 8)
+        y0 = max(0, int(face.landmarks[list(FACE_OVAL), 1].min()) - 8)
+        y1 = min(face.h, int(face.landmarks[list(FACE_OVAL), 1].max()) + 8)
+        if x1 > x0 and y1 > y0:
+            om = _feather(oval, 15)[y0:y1 + 1, x0:x1 + 1].astype(np.float32) / 255.0
+            roi = out[y0:y1 + 1, x0:x1 + 1]
+            lab = cv2.cvtColor(roi, cv2.COLOR_BGR2LAB).astype(np.float32)
+            a = lab[..., 1] - 128.0
+            b = lab[..., 2] - 128.0
+            chroma = np.sqrt(a * a + b * b)
+            weight = np.power(np.clip(1.0 - chroma / 60.0, 0.0, 1.0), 1.5)
+            gain = 1.0 + 0.9 * s_vib * weight
+            na = np.clip(a * gain + 128.0, 0, 255)
+            nb = np.clip(b * gain + 128.0, 0, 255)
+            om2 = om  # (h, w) alpha
+            lab[..., 1] = np.clip((a + 128.0) * (1 - om2) + na * om2, 0, 255)
+            lab[..., 2] = np.clip((b + 128.0) * (1 - om2) + nb * om2, 0, 255)
+            lab = np.clip(lab, 0, 255).astype(np.uint8)
+            out[y0:y1 + 1, x0:x1 + 1] = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
 
     # --- soft light: global warm lift with highlight roll-off (LUT, O(1)).
     # Rolling lift (strongest in shadows, zero at white) closes dark-webcam

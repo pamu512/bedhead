@@ -161,7 +161,7 @@ def apply_autotune(base_preset_dict: dict, result: AutotuneResult) -> dict:
 # ---------------------------------------------------------------------
 
 # Fields the continuous tracker may adapt (ambient-driven, never taste keys).
-CONTINUOUS_FIELDS = ("soft_light", "studio_light")
+CONTINUOUS_FIELDS = ("soft_light", "studio_light", "background_darken")
 
 
 class LookTracker:
@@ -188,6 +188,8 @@ class LookTracker:
         self.deadband = deadband  # ignore suggested deltas below this
         self._face_mask_fn = face_mask_fn
         self._face_fn = face_fn
+        self._ref_bgr = reference_bgr
+        self._ref_bg_stats: dict | None = None  # lazy: needs live shape
         self._last_run: float | None = None  # clock-agnostic; set on first tick
         self.current: dict[str, float] = {k: 0.0 for k in CONTINUOUS_FIELDS}
         self._primed = False
@@ -241,6 +243,28 @@ class LookTracker:
             out["studio_light"] = _clamp01(d_warm / 30.0)
         else:
             out["studio_light"] = 0.0
+        # subject pop: arm the background darken when the live background
+        # reads brighter than the reference's background (bright-room case,
+        # the classic washed-out webcam look); ease toward 0 when the room
+        # already matches. Reference bg = everything outside its face mask.
+        try:
+            if self._ref_bg_stats is None:
+                rm = np.ones(frame_bgr.shape[:2], np.float32)
+                if self._face_mask_fn is not None:
+                    fm = self._face_mask_fn()
+                    if fm is not None and fm.shape == rm.shape:
+                        rm = 1.0 - fm
+                self._ref_bg_stats = _stats(
+                    cv2.resize(self._ref_bgr, (frame_bgr.shape[1], frame_bgr.shape[0])), rm
+                )
+            s_bg = _stats(frame_bgr, 1.0 - mask) if mask is not None else _stats(frame_bgr)
+            d_bg = float(self._ref_bg_stats["L"] - s_bg["L"])
+            if d_bg < -6:  # live bg brighter than reference bg -> crush it
+                out["background_darken"] = _clamp01(-d_bg / 50.0)
+            else:
+                out["background_darken"] = 0.0
+        except Exception:  # noqa: BLE001
+            out["background_darken"] = 0.0
         # under-eye: measured band deficit, same rule as the one-shot path
         if face is not None:
             gap = _band_gap(frame_bgr, face)
