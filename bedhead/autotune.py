@@ -191,6 +191,8 @@ class LookTracker:
         self._face_fn = face_fn
         self._ref_bgr = reference_bgr
         self._ref_bg_stats: dict | None = None  # lazy: needs live shape
+        self._bg_err: float | None = None  # achieved-bg error, updated per cycle
+        self._pending_bg: float | None = None  # live bg measured when strength was set
         self._last_run: float | None = None  # clock-agnostic; set on first tick
         self.current: dict[str, float] = {k: 0.0 for k in CONTINUOUS_FIELDS}
         self._primed = False
@@ -262,9 +264,23 @@ class LookTracker:
                     cv2.resize(self._ref_bgr, (frame_bgr.shape[1], frame_bgr.shape[0])), rm
                 )
             s_bg = _stats(frame_bgr, 1.0 - mask) if mask is not None else _stats(frame_bgr)
+            # closed loop: last cycle we set a strength expecting bg to drop
+            # to target; measure how far the ACHIEVED bg still is from ref
+            if self._pending_bg is not None:
+                self._bg_err = s_bg["L"] - self._ref_bg_stats["L"]
+                self._pending_bg = None
             d_bg = float(self._ref_bg_stats["L"] - s_bg["L"])
             if d_bg < -6:  # live bg brighter than reference bg -> crush it
-                out["background_darken"] = _clamp01(-d_bg / 50.0)
+                # closed loop: measure the PREVIOUS cycle's achieved bg and
+                # correct. Open-loop mapping lost to camera auto-exposure
+                # coupling (darken -> AE brightens -> tracker sees brighter
+                # bg -> repeat). Feedback gain 0.35 keeps it stable.
+                base = _clamp01(-d_bg / 25.0)
+                if self._bg_err is not None:
+                    # bg_err = achieved_live_bg - ref_bg (positive = too bright)
+                    base = _clamp01(base + 0.35 * self._bg_err / 25.0)
+                out["background_darken"] = base
+                self._pending_bg = s_bg["L"]  # compare next cycle vs ref
             else:
                 out["background_darken"] = 0.0
         except Exception:  # noqa: BLE001

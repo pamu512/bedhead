@@ -13,32 +13,32 @@ import numpy as np
 
 def background_darken(
     frame: np.ndarray, person_mask: np.ndarray, strength: float,
+    target_l: float | None = None,
     target_below_face_l: float = 40.0,
 ) -> np.ndarray:
     """Darken the background so the subject pops (competitor 'Studio Light').
 
-    Scales background L* toward (face_L* - target_below_face_l), floor at 20,
-    so the face reads brighter than its surroundings without a hard vignette.
-    `strength` 0..1 (Preset.background_darken).
+    `target_l`: explicit background L* target (e.g. the reference photo's
+    measured background level). Falls back to face_L - target_below_face_l,
+    floor 20. `strength` 0..1 (Preset.background_darken).
     """
     if strength <= 0:
         return frame
     lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
     l_chan = lab[..., 0].astype(np.float32)
-    # face luminance proxy: bright percentile inside the person mask
     face_sel = l_chan[person_mask > 0.6]
     face_l = float(np.percentile(face_sel, 70)) if face_sel.size else 140.0
-    bg_target = max(20.0, face_l - target_below_face_l)
+    bg_target = target_l if target_l is not None else max(20.0, face_l - target_below_face_l)
+    bg_target = max(20.0, float(bg_target))
     bg_sel = l_chan[person_mask <= 0.4]
     bg_l = float(np.median(bg_sel)) if bg_sel.size else 160.0
     if bg_l <= bg_target:
         return frame  # already dark enough; nothing to do
-    # scale factor for background pixels toward the target (overshoot the
-    # naive lerp: the feathered mask average pulls the achieved delta back
-    # toward zero, so aim past the target by the shortfall it introduces)
-    scale = bg_target / max(bg_l, 1e-6)
-    scale = 1.0 - strength * (1.0 - scale) / max(scale, 0.35)
-    new_l = l_chan * scale
+    # bounded move toward the target: fraction = strength, clamped so the
+    # darkest pixels never fall below bg_target (no crush-to-black; the old
+    # overshoot formula drove bg L* to 1 when the gap was large)
+    frac = float(np.clip(strength, 0.0, 1.0))
+    new_l = l_chan + (bg_target - l_chan) * frac
     # composite: background region only, feathered by the mask
     a = (1.0 - person_mask) * strength
     out_l = l_chan * (1 - a) + new_l * a

@@ -375,7 +375,13 @@ def apply(
             s = preset.scaled("studio_light")
             out = studio_light(out, person_m, s)
         if preset.background_darken > 0:
-            out = background_darken(out, person_m, preset.scaled("background_darken"))
+            # target the reference photo's background level when we have one
+            ref_bg_l = None
+            if reference_bgr is not None:
+                _l = cv2.cvtColor(reference_bgr, cv2.COLOR_BGR2LAB)[..., 0]
+                ref_bg_l = float(np.median(_l)) * 0.55  # corners/edges proxy
+            out = background_darken(out, person_m, preset.scaled("background_darken"),
+                                    target_l=ref_bg_l)
 
     # --- eye light (landmark-driven, no segmentation needed)
     if preset.eye_light > 0 and face is not None:
