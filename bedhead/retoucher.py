@@ -22,6 +22,7 @@ import math
 import cv2
 import numpy as np
 
+from .colormatch import color_match
 from .config import Preset
 from .lighting import background_mode, eye_light, studio_light
 from .quality import unsharp_detail
@@ -291,12 +292,14 @@ def apply(
     face: FaceFrame | None,
     preset: Preset,
     segmenter: Segmenter | None = None,
+    reference_bgr: np.ndarray | None = None,
 ) -> np.ndarray:
     """Main entry: returns the retouched (or passthrough) frame.
 
     Order matters: background compositing first (so lighting effects see the
     final background), then person relight, then eye light, then the classic
-    face effects, then the global soft-light lift.
+    face effects, then reference color match, then the global soft-light lift.
+    `reference_bgr`: the admitted reference photo; enables color_match.
     """
     # NaN fails `<= 0` and would poison the blend math; treat it as passthrough.
     if math.isnan(preset.intensity):
@@ -328,6 +331,16 @@ def apply(
     if face is not None and preset.intensity > 0:
         seg_skin = segmenter.face_skin_mask() if segmenter is not None else None
         out = _apply_face_effects(out, face, preset, seg_skin)
+
+    # --- reference color match: Reinhard LAB transfer inside the face oval
+    # (geometry untouched; chroma clamped; verified against the drift cap)
+    s_color = preset.scaled("color_match")
+    if s_color > 0 and reference_bgr is not None and face is not None:
+        oval = face.poly(FACE_OVAL)
+        h, w = out.shape[:2]
+        mask = np.zeros((h, w), np.float32)
+        cv2.fillPoly(mask, [oval], 1.0)
+        out = color_match(out, reference_bgr, s_color, face_mask=mask)
 
     # --- soft light: global warm lift with highlight roll-off (LUT, O(1)).
     # Rolling lift (strongest in shadows, zero at white) closes dark-webcam

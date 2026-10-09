@@ -122,6 +122,7 @@ def main(argv: list[str] | None = None) -> int:
 
     tracker = FaceTracker()
     look_tracker: LookTracker | None = None  # set when --auto-match is admitted
+    reference_img: np.ndarray | None = None  # the admitted reference photo
 
     # --- reference photo admission (gallery upload allowed, identity-gated) ---
     if args.reference:
@@ -167,6 +168,7 @@ def main(argv: list[str] | None = None) -> int:
             print("[bedhead] continuing WITHOUT the reference (Tier A only).", file=sys.stderr)
         else:
             print(f"[bedhead] reference admitted: {result.reason}")
+            reference_img = photo
             if args.auto_match:
                 # reference-guided autotune: one-shot suggestions at startup,
                 # then continuous ambient adaptation while the call runs
@@ -182,7 +184,11 @@ def main(argv: list[str] | None = None) -> int:
                     merged = apply_autotune(asdict(preset), at)
                     for k, v in merged.items():
                         setattr(preset, k, v)
-                    print(f"[bedhead] auto-match applied: {preset.describe()}")
+                    # color match rides along with auto-match at a fixed
+                    # moderate strength (classical Reinhard transfer)
+                    preset.color_match = max(preset.color_match, 0.8)
+                    print(f"[bedhead] auto-match applied (color_match "
+                          f"{preset.color_match:.2f}): {preset.describe()}")
                     look_tracker = LookTracker(photo)
                     look_tracker.prime(live_sample)
                     print("[bedhead] auto-match: continuous mode on "
@@ -252,7 +258,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     print("[bedhead] running. Keys: q/Esc quit · space A/B · 0-9 intensity · "
-          "s/e/h/t/l dials · k studio · i eye-light · b bg strength · n bg mode")
+          "s/e/h/t/l dials · m color-match · k studio · i eye-light · b bg strength · n bg mode")
 
     # FPS stats + panel hot-reload (edits from bedhead.panel land within ~1 s)
     _preset_mtime: float = 0.0
@@ -302,7 +308,8 @@ def main(argv: list[str] | None = None) -> int:
             effect_preset = preset if not preset.show_original else replace(
                 preset, show_original=False
             )
-            out = apply(frame, face, effect_preset, segmenter=seg)
+            out = apply(frame, face, effect_preset, segmenter=seg,
+                        reference_bgr=reference_img)
             # clothes tidy-up + logo blur run on the retouched frame
             cseg = _get_clothes()
             if cseg is not None and (preset.clothes > 0 or preset.stain > 0 or preset.logo_blur > 0):
@@ -342,6 +349,8 @@ def main(argv: list[str] | None = None) -> int:
                     preset.teeth = (preset.teeth + 0.1) % 1.1
                 elif key in ("l", "L"):
                     preset.soft_light = (preset.soft_light + 0.1) % 1.1
+                elif key in ("m", "M"):
+                    preset.color_match = (preset.color_match + 0.2) % 1.2
                 elif key in ("b", "B"):
                     preset.background_strength = (preset.background_strength + 0.2) % 1.2
                 elif key in ("k", "K"):

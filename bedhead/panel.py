@@ -41,6 +41,7 @@ class Panel(tk.Tk):
             ("stain", "Clothes: stain fade"),
             ("logo_blur", "Clothes: blur logos/text"),
             ("soft_light", "Soft light"),
+            ("color_match", "Color match (reference)"),
             ("studio_light", "Studio light (person relight)"),
             ("eye_light", "Eye light (awake)"),
             ("background_strength", "Background strength"),

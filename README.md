@@ -102,6 +102,8 @@ With `--auto-match`, the admitted reference also tunes the Tier A effects: bedhe
 bedhead --reference ~/Pictures/good-day.jpg --auto-match
 ```
 
+Auto-match also enables **reference color match** (the `m` key dials it live): a Reinhard LAB statistics transfer that moves your face's color toward the reference photo's, inside the face oval only, chroma-clamped so skin can never shift into unnatural hues. Measured on a 0.55x-exposure "bad webcam" frame, it closes 45% of the total look gap on top of the Tier A stack, while identity drift stays at 0.90 similarity (cap 0.35), because the transfer changes color statistics only, never geometry.
+
 ## How it works
 
 ```
