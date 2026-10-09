@@ -109,6 +109,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="with --reference: enable guarded generative re-render (spike; "
                          "admitted reference only, drift-capped, fail-safe to Tier A)")
     ap.add_argument("--list-cameras", action="store_true")
+    ap.add_argument("--lock-exposure", action="store_true",
+                    help="freeze camera auto-exposure at startup (external "
+                         "cameras only; built-in Mac cameras expose no AE "
+                         "control -- the background controller self-corrects)")
     ap.add_argument("--version", action="version", version=f"bedhead {__version__}")
     args = ap.parse_args(argv)
 
@@ -135,6 +139,15 @@ def main(argv: list[str] | None = None) -> int:
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.height)
     cap.set(cv2.CAP_PROP_FPS, args.fps)
+
+    if args.lock_exposure:
+        from .aelock import lock_exposure
+
+        if lock_exposure():
+            print("[bedhead] camera auto-exposure locked")
+        else:
+            print("[bedhead] exposure lock not supported by this camera; "
+                  "the background controller will self-correct")
 
     tracker = FaceTracker()
     look_tracker: LookTracker | None = None  # set when --auto-match is admitted
