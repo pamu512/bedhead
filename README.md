@@ -28,16 +28,38 @@ P0.5 (Python). Tier A retouch rebuilt on a research-grade quality engine, plus t
 - ✅ Headless test suite + CI (ruff + pytest, 3.10–3.13)
 - ✅ Standalone binary: PyInstaller one-file build ([docs/PACKAGING.md](docs/PACKAGING.md)),
   CI builds and clean-machine-smokes it every push
+- ✅ Installers: macOS `.pkg` (pkgbuild, notarize-ready) + Windows Inno Setup
+  `.exe` (per-user, PATH, uninstaller); both CI-built and smoke-tested
 - ⏳ Tier B generative re-render (LivePortrait-class; research says Core ML/ANE only, not CPU)
 - 🧪 Tier B spike SHIPPED (guarded): `bedhead --reference you.jpg --tier-b` runs IN Swapper
   under the full guard contract (admitted-reference-only, drift-capped every 10 frames,
-  fail-safe to Tier A, `g` blend dial). CoreML-assisted ~64-76 ms/frame on
+  progressive fail-safe — blend halves before disable, fail-safe to Tier A, `g` blend dial).
+  Frequency-separable composite keeps native-resolution skin texture (HF = raw exactly).
+  CoreML-assisted ~64-76 ms/frame on
   Apple Silicon (CPU-only 205 ms; fp16 a measured regression); real-time
-  needs a full ANE/GPU engine port (P1).
-- ⏳ Identity guard runtime drift cap (admission check already shipped, see below)
+  needs a full ANE/GPU engine port (P1). 256px hyperswap evaluated and
+  closed (see [docs/TIERB-256-EVAL.md](docs/TIERB-256-EVAL.md)).
 - ⏳ Native macOS app + CMIO camera extension
 
 ## Quick start
+
+### Install (no Python needed)
+
+Download the installer for your platform from the latest CI artifacts (or
+[Releases](https://github.com/pamu512/bedhead/releases) once published):
+
+- **macOS** (arm64): `bedhead-<version>-macos.pkg` — double-click; installs
+  `bedhead` into `/usr/local/bin`. First run asks for Camera permission and
+  downloads the models (~20 MiB) once.
+- **Windows** (x64): `bedhead-<version>-windows-x64.exe` — per-user install,
+  adds `bedhead` to your PATH (new terminals), Start-menu shortcuts,
+  clean uninstaller.
+
+Build them yourself from source: see [docs/PACKAGING.md](docs/PACKAGING.md)
+(`scripts/build_mac_installer.sh`, `installer/bedhead.iss`; both CI-built
+and smoke-tested on every push).
+
+### Or run from source
 
 ```bash
 # 1) clone and enter
@@ -60,7 +82,10 @@ bedhead --no-clothes
 # 4) run with virtual camera (macOS: install OBS first — see below)
 bedhead --cam
 
-# 5) optional live control panel (separate terminal, sliders apply live)
+# 5) the full stack: reference-guided, identity-guarded
+bedhead --reference you.jpg --auto-match --tier-b
+
+# 6) optional live control panel (separate terminal, sliders apply live)
 python -m bedhead.panel
 ```
 
@@ -86,6 +111,9 @@ Windows: pyvirtualcam uses the native OBS virtual camera driver (ships with OBS 
 | `s` / `e` / `h` / `t` / `l` | skin / under-eye / shine / teeth / soft-light +0.1 (wraps) |
 | `k` / `i` | studio light / eye light +0.1 (wraps) |
 | `b` / `n` | background strength +0.2 (wraps) / cycle background mode off→blur→dark |
+| `m` | color-match (reference) +0.2 (wraps) |
+| `r` | toggle the reference photo overlay (picture-in-picture, top-right) |
+| `g` | Tier B blend: 0 → 0.25 → 0.50 → 0.75 → 1.00 → off (guarded; fails safe to Tier A) |
 
 Keyboard edits are saved to `~/.bedhead/preset.json` and the Tk panel picks them up (and vice versa).
 
@@ -95,8 +123,8 @@ Keyboard edits are saved to `~/.bedhead/preset.json` and the Tk panel picks them
 | --- | --- |
 | `subtle` | light retouch (intensity 0.4) |
 | `rescue` | full retouch (intensity 0.8) |
-| `studio` | retouch + studio light + eye light + blurred background |
-| `focus` | light retouch + darkened background (all attention on you) |
+| `studio` | retouch + studio light + eye light + subject pop + blurred background |
+| `focus` | light retouch + darkened background with subject pop (all attention on you) |
 
 ### Reference photo (identity-guarded)
 
@@ -172,16 +200,23 @@ bedhead/
 │   ├── tracker.py      # MediaPipe face mesh (one-euro smoothed)
 │   ├── retoucher.py    # Tier A effects (LAB + guided-filter engine)
 │   ├── quality.py      # one-euro filter, hysteresis, frequency separation
-│   ├── lighting.py     # studio light / eye light / background modes
+│   ├── lighting.py     # studio light / eye light / background / face lift
+│   ├── autotune.py     # reference autotune + LookTracker (continuous adapt)
+│   ├── colormatch.py   # Reinhard LAB color match to the reference
 │   ├── segmenter.py    # person/skin/hair segmentation (amortized)
 │   ├── guard.py        # ArcFace identity guard (reference admission)
+│   ├── tierb.py        # guarded generative re-render (IN Swapper)
+│   ├── freqblend.py    # frequency-separable Tier B composite
+│   ├── benchmark.py    # 8-metric quality benchmark
+│   ├── aelock.py       # native camera exposure lock (external cams)
 │   ├── sinks.py        # preview + virtual camera
 │   ├── panel.py        # Tk live control panel
 │   ├── config.py       # Preset dataclass + named presets
 │   └── models.py       # one-time model download (sha256-pinned)
-├── scripts/identity_check.py  # identity-preservation benchmark (VidTIMIT)
+├── installer/bedhead.iss   # Windows Inno Setup installer
+├── scripts/            # mac installer, notarize, identity benchmark, fairness fixtures
 ├── tests/              # headless test suite (+ live_camera marker)
-├── docs/ROADMAP.md     # phases P0→P3 (from the product brief)
+├── docs/               # ROADMAP, PACKAGING, TIERB-256-EVAL, product brief
 └── assets/             # architecture figure
 ```
 
