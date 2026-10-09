@@ -31,7 +31,7 @@ UninstallDisplayIcon={app}\{#MyAppExeName}
 
 [Files]
 ; the one-file PyInstaller build
-Source: "dist\bedhead.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\bedhead.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Dirs]
 ; add {app} to the user PATH so `bedhead` works from any terminal
