@@ -74,3 +74,29 @@ jobs:
 
       - name: Run tests
         run: python -m pytest tests/ -v
+
+  package:
+    # standalone binary artifact (macOS arm64); P2 clean-machine install gate
+    name: pyinstaller binary (macos-latest)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the one-file binary
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[guard]" pyinstaller
+          pyinstaller bedhead.spec --noconfirm
+
+      - name: Clean-machine smoke (no venv, fresh HOME)
+        run: env -i HOME=$(mktemp -d) PATH=/usr/bin:/bin ./dist/bedhead --version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bedhead-macos-arm64
+          path: dist/bedhead

@@ -22,6 +22,8 @@ P0.5 (Python). Tier A retouch rebuilt on a research-grade quality engine, plus t
 - ✅ Preview window with A/B toggle + keyboard dials (incl. k/i/b/n for the new effects)
 - ✅ Live control panel (`bedhead.panel`) with preset hot-reload
 - ✅ Headless test suite + CI (ruff + pytest, 3.10–3.13)
+- ✅ Standalone binary: PyInstaller one-file build ([docs/PACKAGING.md](docs/PACKAGING.md)),
+  CI builds and clean-machine-smokes it every push
 - ⏳ Tier B generative re-render (LivePortrait-class; research says Core ML/ANE only, not CPU)
 - 🧪 Tier B spike SHIPPED (guarded): `bedhead --reference you.jpg --tier-b` runs IN Swapper
   under the full guard contract (admitted-reference-only, drift-capped every 10 frames,
@@ -111,7 +113,6 @@ bedhead --reference ~/Pictures/good-day.jpg --auto-match
 Auto-match also enables **reference color match** (the `m` key dials it live): a Reinhard LAB statistics transfer that moves your face's color toward the reference photo's, inside the face oval only, chroma-clamped so skin can never shift into unnatural hues. Measured on a 0.55x-exposure "bad webcam" frame, it closes 45% of the total look gap on top of the Tier A stack, while identity drift stays at 0.90 similarity (cap 0.35), because the transfer changes color statistics only, never geometry.
 
 ## How it works
-
 ```
 webcam ──► MediaPipe FaceLandmarker ──► Tier A retoucher ──► virtual camera (OBS)
                 (478 pts, ~5 ms)         (skin/eye/shine/      (Zoom/Meet/Teams
