@@ -78,28 +78,33 @@ def under_eye_mask(face: FaceFrame) -> np.ndarray:
     a face is ~140 px across the eye; band must be >= 1500 px per eye.
     """
     h, w = face.h, face.w
-    # lower lid arc per eye: outer corner -> lower mid -> inner corner
-    # (canonical mesh: 130/359 outer corners, 133/362 inner, 145/153 etc.
-    # are lid line; using the full lower rim so the band starts at the lash
-    # line and extends 22% of eye width down, covering the trough)
-    left_arc = (130, 247, 30, 29, 27, 28, 56, 190, 14, 151, 231, 230, 133)
-    right_arc = (359, 467, 260, 259, 257, 258, 286, 414, 294, 243, 362)
-    arcs = (left_arc, right_arc)
     band = np.zeros((h, w), np.uint8)
-    for arc in arcs:
-        pts = face.landmarks[list(arc), :2]
-        span = float(np.linalg.norm(pts.max(axis=0) - pts.min(axis=0))) + 1e-6
-        drop = max(3.0, span * 0.22)
-        # quad: rim arc + the same arc shifted down by `drop`
-        lower = pts[::-1] + np.array([0, drop], np.float32)
-        poly = np.round(np.vstack([pts, lower])).astype(np.int32)
-        cv2.fillPoly(band, [poly], 255)
-    # remove the eye itself and anything near the nose/lips
+    for ring in (LEFT_EYE_RING, RIGHT_EYE_RING):
+        pts = face.landmarks[list(ring), :2].astype(np.float32)
+        ew = float(pts[:, 0].max() - pts[:, 0].min()) + 1e-6
+        drop = max(4.0, ew * 0.45)
+        shifted = pts + np.array([0.0, drop], np.float32)
+        # hull of the eye + its shifted copy cannot self-intersect; the
+        # vstacked-arc quad built before fused across the midline and ran
+        # to the frame bottom
+        both = np.vstack([pts, shifted])
+        hull = cv2.convexHull(both.reshape(-1, 1, 2)).astype(np.int32)
+        cv2.fillPoly(band, [hull], 255)
     band = cv2.subtract(band, _mask_poly(h, w, face.poly(LEFT_EYE_RING)))
     band = cv2.subtract(band, _mask_poly(h, w, face.poly(RIGHT_EYE_RING)))
     band = cv2.subtract(band, _mask_poly(h, w, face.poly(OUTER_LIPS)))
-    solid = band.copy()
-    if int((solid > 0).sum()) < 400:
+    # clip to the face oval: never spill onto the nose bridge or cheeks
+    oval_m = _mask_poly(h, w, face.poly(FACE_OVAL))
+    # nose bridge: exclude a middle strip between the inner eye corners
+    inner_l = float(face.landmarks[133, 0])
+    inner_r = float(face.landmarks[362, 0])
+    mid_lo = int(min(inner_l, inner_r) + (abs(inner_r - inner_l) * 0.10))
+    mid_hi = int(max(inner_l, inner_r) - (abs(inner_r - inner_l) * 0.10))
+    nose_strip = np.zeros((h, w), np.uint8)
+    nose_strip[:, mid_lo:mid_hi] = 255
+    band = cv2.subtract(band, nose_strip)
+    band = cv2.bitwise_and(band, oval_m)
+    if int((band > 0).sum()) < 400:
         # degenerate geometry fallback: ellipse bands under eye centroids
         for ring in (LEFT_EYE_RING, RIGHT_EYE_RING):
             pts = face.landmarks[list(ring), :2]
