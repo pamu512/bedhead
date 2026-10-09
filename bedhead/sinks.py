@@ -9,18 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 
-
-def key_from_code(k: int) -> str | None:
-    """Map a cv2 waitKey return (already masked to 0xFF) to a character.
-
-    Esc (27) is reported as '\\x1b'; printable ASCII as itself; anything
-    else (including the 255 no-key sentinel) as None.
-    """
-    if k == 27:
-        return "\x1b"
-    if 32 <= k < 127:
-        return chr(k)
-    return None
+from .keys import key_from_code
 
 
 class PreviewWindow:

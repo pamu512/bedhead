@@ -42,6 +42,9 @@ uv venv && uv pip install -e .
 # 3) run preview only (no OBS needed)
 bedhead
 
+# 3b) face-only, skip the clothes segmenter
+bedhead --no-clothes
+
 # 4) run with virtual camera (macOS: install OBS first — see below)
 bedhead --cam
 

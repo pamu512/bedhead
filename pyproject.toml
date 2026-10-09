@@ -20,6 +20,10 @@ guard = [
     "onnxruntime>=1.17",
     "opencv-contrib-python>=4.9,<5",
 ]
+dev = [
+    "pytest",
+    "pyyaml",
+]
 
 [project.scripts]
 bedhead = "bedhead.cli:main"

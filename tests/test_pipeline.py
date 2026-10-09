@@ -14,8 +14,8 @@ import numpy as np
 import pytest
 
 from bedhead.config import PRESETS, Preset
+from bedhead.keys import key_from_code
 from bedhead.retoucher import apply, hairline_band_mask, skin_mask, under_eye_mask
-from bedhead.sinks import key_from_code
 from bedhead.tracker import FaceFrame
 
 W, H = 640, 360

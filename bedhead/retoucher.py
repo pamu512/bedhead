@@ -17,6 +17,8 @@ Design rules:
 
 from __future__ import annotations
 
+import math
+
 import cv2
 import numpy as np
 
@@ -109,15 +111,20 @@ def _skin_tone_stats(roi_bgr: np.ndarray, face: FaceFrame) -> tuple[np.ndarray, 
 
 
 def _roi(face: FaceFrame, margin: float = 0.18) -> tuple[int, int, int, int]:
-    """Bounding box of the face oval + margin, clipped to the frame."""
+    """Bounding box of the face oval + margin, clipped to the frame.
+
+    Every edge is clamped independently into the frame, so a face hanging
+    past an edge (or fully outside it) still yields an ordered, in-range
+    box; degenerate slivers are skipped by the caller.
+    """
     pts = face.landmarks[list(FACE_OVAL), :2]
     x0, y0 = pts.min(axis=0)
     x1, y1 = pts.max(axis=0)
     mx, my = (x1 - x0) * margin, (y1 - y0) * margin
-    x0 = int(max(0, x0 - mx))
-    y0 = int(max(0, y0 - my))
-    x1 = int(min(face.w - 1, x1 + mx))
-    y1 = int(min(face.h - 1, y1 + my))
+    x0 = int(np.clip(x0 - mx, 0, face.w - 1))
+    y0 = int(np.clip(y0 - my, 0, face.h - 1))
+    x1 = int(np.clip(x1 + mx, 0, face.w - 1))
+    y1 = int(np.clip(y1 + my, 0, face.h - 1))
     return x0, y0, x1, y1
 
 
@@ -145,6 +152,10 @@ def _retouch_roi(
     """
     out = roi.copy()
     h, w = face.h, face.w
+    # cv2.resize((w // 2, h // 2)) throws when a side is under 2px.
+    if h < 2 or w < 2 or roi.shape[0] < 2 or roi.shape[1] < 2:
+        return roi
+    out = roi.copy()
 
     s_skin = preset.scaled("skin")
     s_eye = preset.scaled("under_eye")
@@ -215,7 +226,7 @@ def _retouch_roi(
             out = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
 
     # --- hairline softening (low-frequency blend in the top band)
-    if s_hair > 0:
+    if s_hair > 0 and w >= 2 and h >= 2:
         band = hairline_band_mask(face)
         soft = cv2.ximgproc.guidedFilter(guide=roi, src=roi, radius=10, eps=150.0)
         a = (band.astype(np.float32) / 255.0) * s_hair * 0.6
@@ -246,8 +257,20 @@ def _apply_face_effects(
     resolution; when present it refines the landmark oval approximation.
     """
     out = frame.copy()
+    fh, fw = out.shape[:2]
+    if fh < 1 or fw < 1:
+        return out
     x0, y0, x1, y1 = _roi(face)
+    # clamp: landmark outliers must never produce an empty or inverted slice
+    x0 = min(max(x0, 0), fw - 1)
+    x1 = min(max(x1, 0), fw - 1)
+    y0 = min(max(y0, 0), fh - 1)
+    y1 = min(max(y1, 0), fh - 1)
+    if y1 <= y0 or x1 <= x0:
+        return out
     roi = out[y0:y1 + 1, x0:x1 + 1]
+    if roi.shape[0] < 2 or roi.shape[1] < 2:
+        return out
     shifted = FaceFrame(
         landmarks=face.landmarks - np.array([x0, y0, 0], dtype=np.float32),
         h=roi.shape[0],
@@ -275,6 +298,9 @@ def apply(
     final background), then person relight, then eye light, then the classic
     face effects, then the global soft-light lift.
     """
+    # NaN fails `<= 0` and would poison the blend math; treat it as passthrough.
+    if math.isnan(preset.intensity):
+        return frame_bgr
     if face is None and not _seg_effects_active(preset):
         return frame_bgr
     if preset.intensity <= 0 and not _seg_effects_active(preset):

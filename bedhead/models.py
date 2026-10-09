@@ -78,15 +78,20 @@ def _download(url: str, sha256: str, dest: Path) -> None:
         else:
             print(f"\r[bedhead]   {done // 1024} KiB", end="")
 
-    urllib.request.urlretrieve(url, tmp, reporthook=hook)
-    print()
-    got = _sha256(tmp)
-    if got != sha256:
-        tmp.unlink()
-        raise RuntimeError(
-            f"{dest.name}: sha256 mismatch (got {got}, expected {sha256}); download discarded"
-        )
-    tmp.rename(dest)
+    try:
+        urllib.request.urlretrieve(url, tmp, reporthook=hook)
+        print()
+        got = _sha256(tmp)
+        if got != sha256:
+            raise RuntimeError(
+                f"{dest.name}: sha256 mismatch (got {got}, expected {sha256});"
+                " download discarded"
+            )
+        tmp.replace(dest)
+    except Exception:
+        print()
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def ensure_models(needed: set[str] | None = None) -> dict[str, Path]:
@@ -101,7 +106,7 @@ def ensure_models(needed: set[str] | None = None) -> dict[str, Path]:
         if needed is not None and name not in needed:
             continue
         dest = MODEL_DIR / name
-        if not dest.exists() or _sha256(dest) != sha256:
+        if not dest.exists():
             _download(url, sha256, dest)
         paths[name] = dest
     return paths

@@ -3,10 +3,29 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import tempfile
 from dataclasses import asdict, dataclass, fields
 from typing import Any
+
+
+def _is_finite_number(value: object) -> bool:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
+def _clamp01(value: float) -> float:
+    value = float(value)
+    if math.isnan(value) or value <= 0.0:
+        return 0.0
+    if value >= 1.0:
+        return 1.0
+    return value
 
 
 @dataclass
@@ -19,6 +38,9 @@ class Preset:
     shine: float = 0.6              # tame oily highlights on skin
     teeth: float = 0.35             # whiten inside inner lips when mouth is open
     hairline: float = 0.0           # EXPERIMENTAL: soften stray strands along hairline band
+    clothes: float = 0.5             # crease/wrinkle softening on the garment mask
+    stain: float = 0.4               # pull faint stains/shading toward garment color
+    logo_blur: float = 0.0           # blur logo/text prints on the garment (redaction)
     soft_light: float = 0.25        # gentle exposure lift + warmth, NVIDIA-brightness style
     studio_light: float = 0.0       # relight the person only (Apple Studio Light class)
     eye_light: float = 0.0          # brighten eye region for an awake look
@@ -27,7 +49,7 @@ class Preset:
     show_original: bool = False     # A/B bypass (preview-only; virtual camera keeps retouched)
 
     def scaled(self, name: str) -> float:
-        return max(0.0, min(1.0, getattr(self, name))) * max(0.0, min(1.0, self.intensity))
+        return _clamp01(getattr(self, name)) * _clamp01(self.intensity)
 
     def save(self, path: str) -> None:
         """Atomically write the preset so a concurrent reader never sees a torn file."""
@@ -52,21 +74,24 @@ class Preset:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
         if not isinstance(data, dict):
-            raise TypeError(f"preset file must contain a JSON object, got {type(data).__name__}")
+            raise ValueError(  # noqa: TRY004 - callers/tests expect ValueError for any bad JSON
+                f"preset file must contain a JSON object, got {type(data).__name__}")
         valid = {f.name for f in fields(cls)}
         kwargs: dict[str, Any] = {}
         for k, v in data.items():
             if k not in valid:
                 continue
             if k == "show_original":
-                kwargs[k] = bool(v)
+                if not isinstance(v, bool):
+                    raise ValueError(f"preset field 'show_original' must be a boolean, got {v!r}")
+                kwargs[k] = v
             elif k == "background_mode":
                 mode = str(v).lower()
                 if mode not in ("off", "blur", "dark"):
                     raise ValueError(f"background_mode must be off|blur|dark, got {v!r}")
                 kwargs[k] = mode
-            elif isinstance(v, bool) or not isinstance(v, (int, float)):
-                raise ValueError(f"preset field {k!r} must be a number, got {v!r}")
+            elif not _is_finite_number(v):
+                raise ValueError(f"preset field {k!r} must be a finite number, got {v!r}")
             else:
                 kwargs[k] = float(v)
         return cls(**kwargs)
@@ -77,6 +102,7 @@ class Preset:
         return (
             f"intensity={self.intensity:.2f} skin={self.skin:.2f} under_eye={self.under_eye:.2f} "
             f"shine={self.shine:.2f} teeth={self.teeth:.2f} hairline={self.hairline:.2f} "
+            f"clothes={self.clothes:.2f} stain={self.stain:.2f} logo_blur={self.logo_blur:.2f} "
             f"soft_light={self.soft_light:.2f} studio={self.studio_light:.2f} "
             f"eye_light={self.eye_light:.2f} {bg}"
         )

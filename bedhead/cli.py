@@ -82,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--height", type=int, default=720)
     ap.add_argument("--fps", type=int, default=30)
     ap.add_argument("--cam", action="store_true", help="enable virtual camera output")
+    ap.add_argument("--no-clothes", action="store_true", help="disable clothes tidy-up (skip segmenter)")
     ap.add_argument("--no-preview", action="store_true", help="disable preview window")
     ap.add_argument("--preset", default=None, help="named preset (subtle|rescue|studio|focus) or JSON path")
     ap.add_argument("--reference", default=None, metavar="PHOTO",
@@ -118,7 +119,6 @@ def main(argv: list[str] | None = None) -> int:
     tracker = FaceTracker()
 
     # --- reference photo admission (gallery upload allowed, identity-gated) ---
-    reference_embedding = None
     if args.reference:
         photo = cv2.imread(args.reference)
         if photo is None:
@@ -154,9 +154,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"[bedhead] reference rejected: {result.reason}", file=sys.stderr)
             print("[bedhead] continuing WITHOUT the reference (Tier A only).", file=sys.stderr)
         else:
-            reference_embedding = ref_emb
             print(f"[bedhead] reference admitted: {result.reason}")
-    del reference_embedding  # Tier B will consume it; not used by Tier A effects
+        # Tier B will consume the admitted embedding; not used by Tier A effects.
 
     segmenter: Segmenter | None = None
 
@@ -177,6 +176,25 @@ def main(argv: list[str] | None = None) -> int:
                       "background/studio-light disabled this run.")
                 return None
         return segmenter
+
+    clothes_seg = None
+
+    def _get_clothes():
+        """Lazily construct the clothes segmenter (tidy-up + logo blur)."""
+        nonlocal clothes_seg
+        if args.no_clothes:
+            return None
+        if clothes_seg is None:
+            try:
+                from .clothes import ClothesSegmenter
+
+                clothes_seg = ClothesSegmenter()
+                print("[bedhead] clothes tidy-up enabled (segmenter ready)")
+            except Exception as e:  # noqa: BLE001
+                print(f"[bedhead] clothes tidy-up unavailable ({e.__class__.__name__}); "
+                      "continuing face-only.")
+                return None
+        return clothes_seg
 
     vcam: VirtualCamSink | None = None
     if args.cam:
@@ -248,6 +266,14 @@ def main(argv: list[str] | None = None) -> int:
                 preset, show_original=False
             )
             out = apply(frame, face, effect_preset, segmenter=seg)
+            # clothes tidy-up + logo blur run on the retouched frame
+            cseg = _get_clothes()
+            if cseg is not None and (preset.clothes > 0 or preset.stain > 0 or preset.logo_blur > 0):
+                from .clothes import tidy
+
+                ts_ms = frame_i * 1000 // max(args.fps, 1)
+                cmask = cseg.clothes_mask_cached(frame, ts_ms)
+                out = tidy(out, cmask, preset)
             proc_ms = (time.perf_counter() - t0) * 1000
             proc_ms_ema = proc_ms if frame_i == 0 else proc_ms_ema * 0.9 + proc_ms * 0.1
 

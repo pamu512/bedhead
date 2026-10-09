@@ -9,10 +9,9 @@ Writes /tmp/bh_fairness/<group>/<person>/<n>.<ext> plus manifest.json.
 """
 import json
 import time
+import urllib.parse
 import urllib.request
 from pathlib import Path
-
-import urllib.parse
 
 UA = "bedhead-fairness-research/0.1 (local analysis; contact dev@bedhead.local)"
 OUT = Path("/tmp/bh_fairness")
@@ -50,7 +49,7 @@ def fetch(url: str, dest: Path) -> bool:
     try:
         with urllib.request.urlopen(req, timeout=25) as r:
             data = r.read()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - best-effort fetcher
         print(f"    fetch fail {e.__class__.__name__}")
         return False
     if len(data) < 20000:  # skip tiny thumbs/decorations

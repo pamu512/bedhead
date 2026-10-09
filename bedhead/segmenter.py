@@ -75,7 +75,11 @@ class Segmenter:
                                  ("hair", hair_s)):
             up = cv2.resize(small_mask, (w, h), interpolation=cv2.INTER_LINEAR)
             cur = getattr(self, name)
-            if cur is None or MASK_EMA >= 0.99:
+            if (
+                cur is None
+                or MASK_EMA >= 0.99
+                or cur.shape != up.shape  # frame size changed: reset, no EMA
+            ):
                 setattr(self, name, up)
             else:
                 # EMA only where masks exist; hard switch avoids ghosting

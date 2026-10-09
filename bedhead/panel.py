@@ -37,6 +37,9 @@ class Panel(tk.Tk):
             ("shine", "Shine control"),
             ("teeth", "Teeth whitening"),
             ("hairline", "Hairline soften (exp.)"),
+            ("clothes", "Clothes: crease softening"),
+            ("stain", "Clothes: stain fade"),
+            ("logo_blur", "Clothes: blur logos/text"),
             ("soft_light", "Soft light"),
             ("studio_light", "Studio light (person relight)"),
             ("eye_light", "Eye light (awake)"),
@@ -93,6 +96,7 @@ class Panel(tk.Tk):
         self._save()
 
     def _save(self) -> None:
+        PRESET_PATH.parent.mkdir(parents=True, exist_ok=True)
         self.preset.save(str(PRESET_PATH))
 
 
