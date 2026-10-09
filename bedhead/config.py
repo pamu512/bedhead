@@ -45,6 +45,8 @@ class Preset:
     color_match: float = 0.0        # reference color match (Reinhard LAB transfer, 0=off)
     vibrance: float = 0.0           # saturation lift weighted to dull pixels (anti-webcam-gray)
     studio_light: float = 0.0       # relight the person only (Apple Studio Light class)
+    background_darken: float = 0.0  # darken background for subject pop
+    detail_boost: float = 0.0       # face-region unsharp (webcams are soft)
     eye_light: float = 0.0          # brighten eye region for an awake look
     background_strength: float = 0.0  # blur/darken background (needs segmentation)
     background_mode: str = "blur"   # "off" | "blur" | "dark"
@@ -119,6 +121,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         "soft_light": 0.2,
         "studio_light": 0.6,
         "eye_light": 0.4,
+        "background_darken": 0.85,
         "background_strength": 0.85,
         "background_mode": "blur",
     },

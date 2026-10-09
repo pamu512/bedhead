@@ -214,7 +214,9 @@ def main(argv: list[str] | None = None) -> int:
                     ref_face_mask = _face_bbox_mask(guard, photo)
                     at = autotune(live_sample, photo,
                                   live_face_mask=live_face_mask,
-                                  reference_face_mask=ref_face_mask)
+                                  reference_face_mask=ref_face_mask,
+                                  face=None)  # no tracked face yet pre-loop;
+                    # under-eye rides the LookTracker's face_fn from frame 1
                     for note in at.notes:
                         print(f"[bedhead] auto-match: {note}")
                     merged = apply_autotune(asdict(preset), at)
@@ -225,7 +227,8 @@ def main(argv: list[str] | None = None) -> int:
                     preset.color_match = max(preset.color_match, 0.8)
                     print(f"[bedhead] auto-match applied (color_match "
                           f"{preset.color_match:.2f}): {preset.describe()}")
-                    look_tracker = LookTracker(photo, face_mask_fn=lambda: live_face_mask)
+                    look_tracker = LookTracker(photo, face_mask_fn=lambda: live_face_mask,
+                                               face_fn=lambda: face)
                     look_tracker.prime(live_sample)
                     print("[bedhead] auto-match: continuous mode on "
                           "(ambient adaptation every ~2 s, face-region stats)")

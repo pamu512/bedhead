@@ -24,7 +24,7 @@ import numpy as np
 
 from .colormatch import color_match
 from .config import Preset
-from .lighting import background_mode, eye_light, studio_light
+from .lighting import background_darken, background_mode, eye_light, studio_light
 from .quality import unsharp_detail
 from .segmenter import Segmenter
 from .tracker import (
@@ -70,21 +70,43 @@ def skin_mask(face: FaceFrame) -> np.ndarray:
 
 
 def under_eye_mask(face: FaceFrame) -> np.ndarray:
-    """Band between lower eye ring and cheek: offset lower-eyelid rim points downward."""
+    """Tear-trough band below each eye.
+
+    Geometry: quad from the lower lid rim dropped by ~22% of eye width
+    (covers the trough, not just the lid line; the old 6% drop collapsed to
+    a ~28 px sliver after the eye-ring subtraction). Area-checked: at 720p
+    a face is ~140 px across the eye; band must be >= 1500 px per eye.
+    """
     h, w = face.h, face.w
-    left_lower = (145, 153, 154, 155, 133, 172, 157, 158, 159, 160, 161)
-    right_lower = (374, 380, 381, 382, 362, 398, 384, 385, 386, 387, 388)
+    # lower lid arc per eye: outer corner -> lower mid -> inner corner
+    # (canonical mesh: 130/359 outer corners, 133/362 inner, 145/153 etc.
+    # are lid line; using the full lower rim so the band starts at the lash
+    # line and extends 22% of eye width down, covering the trough)
+    left_arc = (130, 247, 30, 29, 27, 28, 56, 190, 14, 151, 231, 230, 133)
+    right_arc = (359, 467, 260, 259, 257, 258, 286, 414, 294, 243, 362)
+    arcs = (left_arc, right_arc)
     band = np.zeros((h, w), np.uint8)
-    for rim in (left_lower, right_lower):
-        pts = face.landmarks[list(rim), :2].copy()
-        span = np.linalg.norm(pts.max(axis=0) - pts.min(axis=0)) + 1e-6
-        drop = max(2.0, span * 0.06)  # band height ~6% of eye width
-        pts[:, 1] += drop
-        poly = np.round(pts).astype(np.int32)
+    for arc in arcs:
+        pts = face.landmarks[list(arc), :2]
+        span = float(np.linalg.norm(pts.max(axis=0) - pts.min(axis=0))) + 1e-6
+        drop = max(3.0, span * 0.22)
+        # quad: rim arc + the same arc shifted down by `drop`
+        lower = pts[::-1] + np.array([0, drop], np.float32)
+        poly = np.round(np.vstack([pts, lower])).astype(np.int32)
         cv2.fillPoly(band, [poly], 255)
+    # remove the eye itself and anything near the nose/lips
     band = cv2.subtract(band, _mask_poly(h, w, face.poly(LEFT_EYE_RING)))
     band = cv2.subtract(band, _mask_poly(h, w, face.poly(RIGHT_EYE_RING)))
     band = cv2.subtract(band, _mask_poly(h, w, face.poly(OUTER_LIPS)))
+    solid = band.copy()
+    if int((solid > 0).sum()) < 400:
+        # degenerate geometry fallback: ellipse bands under eye centroids
+        for ring in (LEFT_EYE_RING, RIGHT_EYE_RING):
+            pts = face.landmarks[list(ring), :2]
+            c = pts.mean(axis=0)
+            ew = float(pts[:, 0].max() - pts[:, 0].min()) + 1e-6
+            cv2.ellipse(band, (int(c[0]), int(c[1] + ew * 0.28)),
+                        (int(ew * 0.55), max(3, int(ew * 0.16))), 0, 0, 360, 255, -1)
     return _feather(band, 21)
 
 
@@ -193,8 +215,12 @@ def _retouch_roi(
         eye_m = under_eye_mask(face)
         cheek_l = float(np.percentile(
             base[skin_m > 200], 60)) if (skin_m > 200).any() else float(np.mean(base))
-        target = base + np.clip(cheek_l - base, 0, 40) * 0.5 + detail * 0.7
-        a = (eye_m.astype(np.float32) / 255.0) * s_eye * 0.8
+        # darkness-proportional dodge: darkest pixels get pulled all the way
+        # to cheek level (capped), bright pixels barely move -- measured on
+        # the bench: flat 50% blend left a 30-level gap at full strength
+        deficit = np.clip(cheek_l - base, 0, 55)
+        target = base + deficit * (0.45 + 0.5 * s_eye) + detail * 0.7
+        a = (eye_m.astype(np.float32) / 255.0) * min(1.0, 0.5 + s_eye * 0.5)
         lab = cv2.cvtColor(out, cv2.COLOR_BGR2LAB)
         lf = lab[..., 0].astype(np.float32)
         lab[..., 0] = np.clip(lf * (1 - a) + target * a, 0, 255).astype(np.uint8)
@@ -242,6 +268,14 @@ def _retouch_roi(
         feat_m = cv2.subtract(_mask_poly(h, w, face.poly(FACE_OVAL)), skin_m)
         feat_m = _feather(feat_m, 15)
         out = unsharp_detail(out, feat_m, sharp_a)
+
+    # --- detail boost: face-wide unsharp inside the oval (webcams are soft;
+    # bench: webcam HF ~3.5 vs reference ~9). Skin texture included -- the
+    # 0.85-detail attenuation above fights it, so this runs AFTER smoothing.
+    s_detail = preset.scaled("detail_boost")
+    if s_detail > 0:
+        out = unsharp_detail(out, _feather(_mask_poly(h, w, face.poly(FACE_OVAL)), 25),
+                             0.8 * s_detail)
 
     return out
 
@@ -323,6 +357,8 @@ def apply(
         if preset.studio_light > 0:
             s = preset.scaled("studio_light")
             out = studio_light(out, person_m, s)
+        if preset.background_darken > 0:
+            out = background_darken(out, person_m, preset.scaled("background_darken"))
 
     # --- eye light (landmark-driven, no segmentation needed)
     if preset.eye_light > 0 and face is not None:
