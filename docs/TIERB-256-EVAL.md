@@ -21,7 +21,7 @@ composite (native-res texture, HF = raw exactly) remains the Tier B path.
 2. **Embedding mismatch (root cause of failure)**: with our insightface
    buffalo arcface unit-norm embedding, output is a subtly retouched copy of
    the input (pixel corr 0.987, mean diff 5/255; normed == zeros control
-   within 4.7) -- the source embedding is effectively ignored. With the RAW
+   within 4.7). The source embedding is effectively ignored. With the RAW
    (unnormalized) embedding, the decoder is driven far out of distribution:
    magenta cast, merged eye sockets, clipped posterized histograms; the SCRFD
    detector finds no face. facefusion evidently pairs hyperswap with a

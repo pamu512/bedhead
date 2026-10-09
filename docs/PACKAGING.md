@@ -40,7 +40,7 @@ are large but self-contained).
 
 ## Packaging notes (hard-won)
 
-- entry must be a module (`bedhead/__main__.py`) — a bare script breaks
+- entry must be a module (`bedhead/__main__.py`): a bare script breaks
   relative imports in the frozen app
 - `mediapipe` needs `collect_all` **plus** an explicit binaries glob for
   `mediapipe/tasks/c/` (its C bindings + `libmediapipe.dylib` are loaded

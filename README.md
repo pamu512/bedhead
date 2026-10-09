@@ -1,10 +1,10 @@
 # bedhead
 
-**Look presentable on video calls.** Bed Head is a Tier A "good-day" filter: it tracks your face with a 478-point mesh and applies corrective retouch — skin, under-eyes, shine, teeth, hairline — then publishes the result to a virtual camera your meeting app already knows.
+**Look presentable on video calls.** Bed Head is a Tier A "good-day" filter: it tracks your face with a 478-point mesh and applies corrective retouch (skin, under-eyes, shine, teeth, hairline), then publishes the result to a virtual camera your meeting app already knows.
 
 > You, but on a good day. Not someone else.
 
-![pipeline](assets/bedhead-architecture.png)
+![pipeline](assets/bedhead-architecture.svg)
 
 ## Status
 
@@ -33,7 +33,7 @@ P0.5 (Python). Tier A retouch rebuilt on a research-grade quality engine, plus t
 - ⏳ Tier B generative re-render (LivePortrait-class; research says Core ML/ANE only, not CPU)
 - 🧪 Tier B spike SHIPPED (guarded): `bedhead --reference you.jpg --tier-b` runs IN Swapper
   under the full guard contract (admitted-reference-only, drift-capped every 10 frames,
-  progressive fail-safe — blend halves before disable, fail-safe to Tier A, `g` blend dial).
+  progressive fail-safe: blend halves before disable, fail-safe to Tier A, `g` blend dial).
   Frequency-separable composite keeps native-resolution skin texture (HF = raw exactly).
   CoreML-assisted ~64-76 ms/frame on
   Apple Silicon (CPU-only 205 ms; fp16 a measured regression); real-time
@@ -48,10 +48,10 @@ P0.5 (Python). Tier A retouch rebuilt on a research-grade quality engine, plus t
 Download the installer for your platform from the latest CI artifacts (or
 [Releases](https://github.com/pamu512/bedhead/releases) once published):
 
-- **macOS** (arm64): `bedhead-<version>-macos.pkg` — double-click; installs
+- **macOS** (arm64): `bedhead-<version>-macos.pkg`. Double-click; installs
   `bedhead` into `/usr/local/bin`. First run asks for Camera permission and
   downloads the models (~20 MiB) once.
-- **Windows** (x64): `bedhead-<version>-windows-x64.exe` — per-user install,
+- **Windows** (x64): `bedhead-<version>-windows-x64.exe`. Per-user install,
   adds `bedhead` to your PATH (new terminals), Start-menu shortcuts,
   clean uninstaller.
 
@@ -79,7 +79,7 @@ bedhead
 # 3b) face-only, skip the clothes segmenter
 bedhead --no-clothes
 
-# 4) run with virtual camera (macOS: install OBS first — see below)
+# 4) run with virtual camera (macOS: install OBS first; see below)
 bedhead --cam
 
 # 5) the full stack: reference-guided, identity-guarded
@@ -89,7 +89,7 @@ bedhead --reference you.jpg --auto-match --tier-b
 python -m bedhead.panel
 ```
 
-First run downloads the MediaPipe face-landmarker model (3.7 MiB) into your user cache directory (`~/Library/Caches/bedhead` on macOS, `~/.cache/bedhead` on Linux), verified against a pinned sha256. The selfie segmenter (16.4 MiB) is fetched on first use of a segmentation feature (background/studio light/subject pop, or clothes tidy-up, which is on by default -- `--no-clothes` skips it, so a plain `bedhead` run downloads both models).
+First run downloads the MediaPipe face-landmarker model (3.7 MiB) into your user cache directory (`~/Library/Caches/bedhead` on macOS, `~/.cache/bedhead` on Linux), verified against a pinned sha256. The selfie segmenter (16.4 MiB) is fetched on first use of a segmentation feature (background/studio light/subject pop, or clothes tidy-up, which is on by default. `--no-clothes` skips it, so a plain `bedhead` run downloads both models).
 
 ### macOS virtual camera setup (OBS path)
 
@@ -134,7 +134,7 @@ Tier B features take a reference photo, and it can come from your gallery:
 bedhead --reference ~/Pictures/good-day.jpg
 ```
 
-The reference is only used after it passes an on-device admission check: bedhead samples ~15 live frames, embeds the face on camera and the face in the photo (ArcFace), and requires cosine similarity >= 0.40 (calibrated: same-person photos score 0.73+, a measured foreign face scored 0.10 (just at the 0.40 gate)). A photo of someone else is rejected and the run continues Tier-A-only. Requires the `guard` extra: `pip install 'bedhead[guard]'`.
+The reference is only used after it passes an on-device admission check: bedhead samples ~15 live frames, embeds the face on camera and the face in the photo (ArcFace), and requires cosine similarity >= 0.40 (calibrated in `bedhead/guard.py`: same-person pairs 0.73 to 0.78, cross-person pairs -0.04 to 0.06). A photo of someone else is rejected and the run continues Tier-A-only. Requires the `guard` extra: `pip install 'bedhead[guard]'`.
 
 **Tier B spike (guarded generative re-render)**: with an admitted reference, `--tier-b` re-renders your face from that reference (IN Swapper). The guard contract is enforced in code: only an admitted reference can ever be registered as the identity source, output identity is re-checked every 10 frames against the reference (drift cap 0.35; measured 0.95 on a genuine reference), and any violation fails safe to Tier A. The `g` key blends Tier A <-> Tier B. Perf is CoreML-assisted (~64-76 ms/frame on Apple Silicon CPU+ANE partitioning; pure CPU is 205 ms; fp16 conversion is a measured regression on this CPU). Not real-time yet: that needs a full ANE/GPU engine port (P1). One-time model: place `inswapper_128.onnx` in the model cache (see `bedhead/models.py` MODEL_DIR).
 
@@ -158,7 +158,7 @@ webcam ──► MediaPipe FaceLandmarker ──► Tier A retoucher ──► v
 | Track | `bedhead/tracker.py` | 478-point mesh + blendshapes (jawOpen gates teeth) | No face → frame passes through untouched |
 | Retouch | `bedhead/retoucher.py` | Feathered, landmark-masked effects; all strengths 0–1, capped | Effects at 0 skip their path (feature sharpening still runs at low strength while the face is retouched) |
 | Deliver | `bedhead/sinks.py` | Preview window and/or pyvirtualcam sink | vcam open fails → preview-only, never crash |
-| Control | `bedhead/cli.py` + `panel.py` | Keyboard dials + Tk sliders; preset JSON hot-reload | — |
+| Control | `bedhead/cli.py` + `panel.py` | Keyboard dials + Tk sliders; preset JSON hot-reload | none |
 
 Every regional edit is feathered and clamped; nothing drifts: the output is your frame with bounded corrections, never a generated face (that's Tier B, guarded).
 

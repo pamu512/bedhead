@@ -19,15 +19,16 @@ PRESET_PATH = Path.home() / ".bedhead" / "preset.json"
 class Panel(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
-        self.title("Bed Head — control panel")
+        self.title("Bed Head: control panel")
         self.minsize(360, 420)
         self.preset = Preset()
+        self._load_error: str | None = None
         self._load()
 
         frm = ttk.Frame(self, padding=16)
         frm.pack(fill="both", expand=True)
         ttk.Label(frm, text="Bed Head", font=("system", 22, "bold")).pack(anchor="w")
-        ttk.Label(frm, text="look presentable on video calls", foreground="#777").pack(anchor="w")
+        ttk.Label(frm, text="look presentable on video calls", foreground="#666666").pack(anchor="w")
 
         self.vars: dict[str, tk.DoubleVar] = {}
         rows = (
@@ -63,7 +64,11 @@ class Panel(tk.Tk):
             val.pack(side="left", padx=(8, 0))
             var.trace_add("write", lambda *_a, n=name, l=val: l.config(text=f"{self.vars[n].get():.2f}"))
 
-        self.status = ttk.Label(frm, text="auto-saving to ~/.bedhead/preset.json", foreground="#7a4a3a")
+        self.status = ttk.Label(
+            frm,
+            text=self._load_error or "auto-saving to ~/.bedhead/preset.json",
+            foreground="#7a4a3a",
+        )
         self.status.pack(anchor="w", pady=(14, 0))
 
         bg_row = ttk.Frame(frm)
@@ -84,7 +89,7 @@ class Panel(tk.Tk):
             try:
                 self.preset = Preset.load(str(PRESET_PATH))
             except (OSError, ValueError, json.JSONDecodeError):
-                pass  # unreadable/partial preset: keep defaults, panel will overwrite
+                self._load_error = "Could not read preset.json. Showing defaults."
 
     def _on_slide(self, name: str) -> None:
         setattr(self.preset, name, float(self.vars[name].get()))
@@ -101,8 +106,17 @@ class Panel(tk.Tk):
         self._save()
 
     def _save(self) -> None:
-        PRESET_PATH.parent.mkdir(parents=True, exist_ok=True)
-        self.preset.save(str(PRESET_PATH))
+        try:
+            PRESET_PATH.parent.mkdir(parents=True, exist_ok=True)
+            self.preset.save(str(PRESET_PATH))
+        except OSError:
+            self._set_status("Could not save preset.json.")
+            return
+        self._set_status("auto-saving to ~/.bedhead/preset.json")
+
+    def _set_status(self, text: str) -> None:
+        if hasattr(self, "status"):
+            self.status.config(text=text)
 
 
 if __name__ == "__main__":

@@ -112,7 +112,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--lock-exposure", action="store_true",
                     help="freeze camera auto-exposure at startup (external "
                          "cameras only; built-in Mac cameras expose no AE "
-                         "control -- the background controller self-corrects)")
+                         "control; the background controller self-corrects)")
     ap.add_argument("--version", action="version", version=f"bedhead {__version__}")
     args = ap.parse_args(argv)
 

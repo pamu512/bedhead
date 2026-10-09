@@ -8,7 +8,7 @@
   <rect x="0" y="0" width="1600" height="800" fill="#faf8f5"/>
 
   <!-- Header -->
-  <text x="60" y="84" font-size="14" font-weight="600" letter-spacing="4" fill="#b5432c">BED HEAD — SYSTEM BLUEPRINT</text>
+  <text x="60" y="84" font-size="14" font-weight="600" letter-spacing="4" fill="#b5432c">BED HEAD: SYSTEM BLUEPRINT</text>
   <text x="1540" y="84" text-anchor="end" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="13" fill="#6f6862">v0.1 draft · 8 Oct 2026</text>
   <text x="1540" y="106" text-anchor="end" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="13" fill="#6f6862">all processing on-device</text>
   <text x="60" y="128" font-size="34" font-weight="650" letter-spacing="-0.5" fill="#1c1917">One good-day photo → your live meeting face</text>
@@ -24,7 +24,7 @@
     <text x="96" y="298" font-size="12.5" fill="#6f6862">720p · 30 fps input</text>
     <text x="96" y="320" font-size="12.5" fill="#6f6862">frames stay on device</text>
     <rect x="80" y="362" width="216" height="104" fill="#f4efe8" stroke="#e2dad0" stroke-width="1" rx="3"/>
-    <text x="96" y="390" font-size="17" font-weight="600" fill="#1c1917">Reference photo — once</text>
+    <text x="96" y="390" font-size="17" font-weight="600" fill="#1c1917">Reference photo, once</text>
     <text x="96" y="414" font-size="12.5" fill="#6f6862">your good-day selfie</text>
     <text x="96" y="436" font-size="12.5" fill="#6f6862">guided capture at setup</text>
   </g>
@@ -47,12 +47,12 @@
     <text x="692" y="216"><tspan font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="17" font-weight="700" fill="#b5432c">03</tspan><tspan dx="10" font-size="12.5" font-weight="600" letter-spacing="2" fill="#6f6862">RENDER</tspan></text>
     <line x1="692" y1="230" x2="908" y2="230" stroke="#e5ddd3" stroke-width="1"/>
     <rect x="692" y="244" width="216" height="118" fill="#f4efe8" stroke="#e2dad0" stroke-width="1" rx="3"/>
-    <text x="708" y="270" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="12" font-weight="700" letter-spacing="1" fill="#b5432c">TIER A — RETOUCH</text>
+    <text x="708" y="270" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="12" font-weight="700" letter-spacing="1" fill="#b5432c">TIER A: RETOUCH</text>
     <text x="708" y="294" font-size="12.5" fill="#6f6862">skin even-out, under-eye</text>
     <text x="708" y="316" font-size="12.5" fill="#6f6862">stray-hair &amp; shine cleanup</text>
     <text x="708" y="338" font-size="12.5" fill="#6f6862">subtle by default</text>
     <rect x="692" y="378" width="216" height="118" fill="#f4efe8" stroke="#e2dad0" stroke-width="1" rx="3"/>
-    <text x="708" y="404" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="12" font-weight="700" letter-spacing="1" fill="#b5432c">TIER B — RE-RENDER</text>
+    <text x="708" y="404" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="12" font-weight="700" letter-spacing="1" fill="#b5432c">TIER B: RE-RENDER</text>
     <text x="708" y="428" font-size="12.5" fill="#6f6862">good-day look from photo</text>
     <text x="708" y="450" font-size="12.5" fill="#6f6862">applied onto live mesh</text>
     <text x="708" y="472" font-size="12.5" fill="#6f6862">expressions stay yours</text>
@@ -79,7 +79,7 @@
     <text x="1304" y="300" font-size="13" fill="#6f6862">appears as a normal webcam</text>
     <text x="1304" y="326" font-size="13" fill="#6f6862">Zoom · Meet · Teams · OBS</text>
     <text x="1304" y="352" font-size="13" fill="#6f6862">no meeting-app install</text>
-    <text x="1304" y="378" font-size="13" fill="#6f6862">1080p · 30 fps out</text>
+    <text x="1304" y="378" font-size="13" fill="#6f6862">preview if virtual camera fails</text>
   </g>
 
   <!-- Flow arrows -->
@@ -91,26 +91,26 @@
   <!-- Onboarding lane -->
   <g>
     <rect x="60" y="556" width="920" height="124" fill="#f6f2ec" stroke="#c9c0b4" stroke-width="1" stroke-dasharray="5 4" rx="3"/>
-    <text x="84" y="588" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="12.5" font-weight="700" letter-spacing="1.5" fill="#b5432c">ONBOARDING — RUNS ONCE, OFFLINE</text>
+    <text x="84" y="588" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="12.5" font-weight="700" letter-spacing="1.5" fill="#b5432c">ONBOARDING: RUNS ONCE, OFFLINE</text>
     <text x="84" y="616" font-size="13.5" fill="#1c1917">guided selfie → face embedding + good-day preset (tidy hair · clear skin · optional light makeup)</text>
-    <text x="84" y="642" font-size="12.5" fill="#6f6862">preset stays local and encrypted; removed on uninstall</text>
+    <text x="84" y="642" font-size="12.5" fill="#6f6862">preset stays on the device</text>
     <path d="M 800 556 L 800 520" fill="none" stroke="#b5432c" stroke-width="2" marker-end="url(#arr)"/>
   </g>
 
   <!-- Latency budget -->
   <g>
     <rect x="1010" y="556" width="530" height="124" fill="#f4efe8" stroke="#e2dad0" stroke-width="1" rx="3"/>
-    <text x="1034" y="586" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="12.5" font-weight="700" letter-spacing="1" fill="#b5432c">LATENCY BUDGET — 720p (design targets)</text>
+    <text x="1034" y="586" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="12.5" font-weight="700" letter-spacing="1" fill="#b5432c">LATENCY BUDGET: 720p (design targets)</text>
     <rect x="1034" y="602" width="56" height="14" fill="#1c1917"/>
     <rect x="1091" y="602" width="44" height="14" fill="#6f6862"/>
     <rect x="1136" y="602" width="247" height="14" fill="#b5432c"/>
     <rect x="1384" y="602" width="90" height="14" fill="#a89f94"/>
-    <text x="1034" y="640" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="11.5" fill="#6f6862">track ~5 · retouch ~4 · re-render 15–30 (GPU) · comp ~8 — ms</text>
+    <text x="1034" y="640" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="11.5" fill="#6f6862">track ~5 · retouch ~4 · re-render 15-30 (GPU) · comp ~8 ms</text>
     <text x="1034" y="662" font-size="12" fill="#6f6862">≈ 30 fps on a modern laptop; auto-fallback to Tier A</text>
   </g>
 
   <!-- Footer -->
   <line x1="60" y1="724" x2="1540" y2="724" stroke="#d9d1c6" stroke-width="1"/>
-  <text x="60" y="752" font-size="13" fill="#6f6862">Figure 1 — Bed Head pipeline: track → retouch / re-render under an identity guard → virtual camera. The reference photo never leaves the device.</text>
+  <text x="60" y="752" font-size="13" fill="#6f6862">Figure 1. Bed Head pipeline: track → retouch / re-render under an identity guard → virtual camera. The reference photo never leaves the device.</text>
   <text x="1540" y="752" text-anchor="end" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="11.5" fill="#6f6862">bed head · blueprint v0.1</text>
 </svg>

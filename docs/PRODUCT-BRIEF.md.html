@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bed Head — Product &amp; Engineering Brief</title>
+<title>Bed Head: Product &amp; Engineering Brief</title>
 <style>
   :root{
-    --bg:#f7f6f3; --paper:#fffdf9; --ink:#1a1c1e; --ink-soft:#5c6167; --ink-faint:#8a8f94;
+    --bg:#f7f6f3; --paper:#fffdf9; --ink:#1a1c1e; --ink-soft:#5c6167; --ink-faint:#5e6368;
     --hair:#e0dcd4; --hair-soft:#eae6de; --accent:#b5432c; --accent-ink:#8c3322;
     --wash:#f1eee8;
   }
@@ -91,20 +91,20 @@
   <header class="mast">
     <div class="kicker">PRODUCT &amp; ENGINEERING BRIEF · v0.1</div>
     <h1>Bed Head</h1>
-    <p class="sub">A meeting filter that keeps <i>you</i> on camera — just the rested, groomed, good-day version. One reference photo at setup; every call after that, you look presentable in one click.</p>
+    <p class="sub">A meeting filter that keeps <i>you</i> on camera: just the rested, groomed, good-day version. One reference photo at setup; every call after that, you look presentable in one click.</p>
     <div class="meta-row">
       <div><b>Prepared</b>8 October 2026</div>
       <div><b>Scope</b>Concept validation · tech stack · build plan · market scan</div>
-      <div><b>Status</b>Pre-prototype — no code written yet</div>
+      <div><b>Status</b>Concept note. A Python spike is in this repo (see the README).</div>
       <div><b>Privacy stance</b>All processing on-device, reference photo never uploaded</div>
     </div>
 
     <div class="verdict">
       <div class="v-head">EXECUTIVE VERDICT</div>
       <div class="v-body">
-        <p><b>Buildable: yes.</b> Every hard component exists today as production software — face tracking (478-point meshes), generative re-rendering (LivePortrait-class models), and system virtual cameras. You are assembling proven parts, not inventing new science.</p>
+        <p><b>Buildable: yes.</b> Every hard component exists today as production software: face tracking (478-point meshes), generative re-rendering (LivePortrait-class models), and system virtual cameras. You are assembling proven parts, not inventing new science.</p>
         <p><b>The moat is the identity lock.</b> Naive deepfake pipelines make you look like a wax mask. The product problem is capping how far the render can drift from your real face so it reads as "you on a good day" at 30 fps. That guard, plus one-photo onboarding, is the differentiated engineering.</p>
-        <p><b>The market gap is real but soft.</b> Built-in filters (Zoom/Meet/Teams) do skin smoothing only. xpression camera does full face swap — too far. Nothing mainstream does "my face, my reference photo, mildly fixed." That's your lane.</p>
+        <p><b>The market gap is real but soft.</b> Built-in filters (Zoom/Meet/Teams) do skin smoothing only. xpression camera does full face swap, which is too far. Nothing mainstream does "my face, my reference photo, mildly fixed." That's your lane.</p>
       </div>
     </div>
   </header>
@@ -113,8 +113,8 @@
   <section>
     <div class="sec-head"><span class="sec-no">01</span><h2>What the user actually gets</h2></div>
     <div class="prose">
-      <p><b>Setup, once:</b> the app asks for a reference photo — a good-day selfie: hair done, skin clear, optionally light makeup, front-facing, good light. From it the app builds a local, encrypted <b>good-day preset</b>: a face embedding plus retouch parameters. The photo never leaves the device.</p>
-      <p><b>Every call after:</b> Bed Head appears to Zoom, Meet, Teams, or OBS as an ordinary webcam. You pick "Bed Head Camera" as your camera, choose an intensity — <i>Off / Subtle / Full rescue</i> — and join. Bad hair reads tidy. Under-eye circles read rested. Last night reads slept. Mouth, blinks, head turns and expressions stay yours, live, because the output is your face being re-rendered each frame — not a static sticker over it.</p>
+      <p><b>Setup, once:</b> the app asks for a reference photo, a good-day selfie: hair done, skin clear, optionally light makeup, front-facing, good light. From it the app builds a local <b>good-day preset</b>: a face embedding plus retouch parameters. The photo never leaves the device.</p>
+      <p><b>Every call after:</b> Bed Head appears to Zoom, Meet, Teams, or OBS as an ordinary webcam. You pick "Bed Head Camera" as your camera, choose an intensity (<i>Off / Subtle / Full rescue</i>), and join. Bad hair reads tidy. Under-eye circles read rested. Last night reads slept. Mouth, blinks, head turns and expressions stay yours, live, because the output is your face being re-rendered each frame, not a static sticker over it.</p>
       <ul>
         <li><b>Fail-safe by design:</b> if tracking drops (you look away, light collapses, GPU stutters), the system falls back to lightweight retouch, never to a frozen or glitched face.</li>
         <li><b>Honesty dial:</b> an optional on-screen indicator and one-click kill switch. Recommended default: on. More in §06.</li>
@@ -124,30 +124,30 @@
 
   <!-- ======================= 02 TECH ======================= -->
   <section>
-    <div class="sec-head"><span class="sec-no">02</span><h2>How it works — the pipeline</h2></div>
+    <div class="sec-head"><span class="sec-no">02</span><h2>How it works: the pipeline</h2></div>
 
     <figure>
-      <img src="../assets/bedhead-architecture.png" alt="Bed Head architecture: webcam and reference photo feed a face tracker; a render tier applies retouch or re-render under an identity guard; output goes to a virtual camera consumed by meeting apps.">
-      <figcaption><b>Fig. 1 — System blueprint.</b> Two inputs (live webcam + one-time reference photo), three processing stages (track → render → guard), one output (virtual camera). Latency figures are design targets for 720p on a modern laptop, not measurements.</figcaption>
+      <img src="../assets/bedhead-architecture.svg" alt="Bed Head architecture: webcam and reference photo feed a face tracker; a render tier applies retouch or re-render under an identity guard; output goes to a virtual camera consumed by meeting apps.">
+      <figcaption><b>Fig. 1. System blueprint.</b> Two inputs (live webcam + one-time reference photo), three processing stages (track → render → guard), one output (virtual camera). Latency figures are design targets for 720p on a modern laptop, not measurements.</figcaption>
     </figure>
 
     <div class="prose">
-      <p>Each frame from the webcam is tracked, enhanced, checked, and published to a virtual camera — in roughly 30–45 ms end to end on a modern laptop GPU, which is what 30 fps requires. The stages:</p>
+      <p>Each frame from the webcam is tracked, enhanced, checked, and published to a virtual camera. The latency numbers in the figure are design targets, not measurements. The stages:</p>
 
-      <p><b>1 · Face tracking (solved problem).</b> A landmark model fits a dense 3D mesh — 478 points covering jawline, hairline, eyes, lips — to your face every frame, plus head pose, gaze, and expression coefficients. Google's MediaPipe Face Landmarker does this in single-digit milliseconds on CPU and runs on macOS, Windows, iOS, Android and the web; it is the default open-source choice. Commercial SDKs (Banuba, DeepAR, FaceUnity) ship equivalent trackers bundled with beauty effects.</p>
+      <p><b>1 · Face tracking (solved problem).</b> A landmark model fits a dense 3D mesh (478 points covering jawline, hairline, eyes, lips) to your face every frame, plus head pose, gaze, and expression coefficients. Google's MediaPipe Face Landmarker does this in single-digit milliseconds on CPU and runs on macOS, Windows, iOS, Android and the web; it is the default open-source choice. Commercial SDKs (Banuba, DeepAR, FaceUnity) ship equivalent trackers bundled with beauty effects.</p>
 
-      <p><b>2 · Rendering — two tiers, one product.</b> This is the core design decision, so it gets its own section below.</p>
+      <p><b>2 · Rendering: two tiers, one product.</b> This is the core design decision, so it gets its own section below.</p>
 
-      <p><b>3 · The identity guard (your secret sauce).</b> A small face-embedding model compares each output frame against <i>both</i> your live face and your reference embedding. If the rendered face drifts too far from "you" — waxiness, wrong jaw, frozen micro-expressions — the guard blends the render back toward the conservative tier. It also runs temporal smoothing so the face doesn't flicker between frames. Fail-safe direction is always <i>toward</i> your real face, never away from it.</p>
+      <p><b>3 · The identity guard (your secret sauce).</b> A small face-embedding model compares each output frame against <i>both</i> your live face and your reference embedding. If the rendered face drifts too far from you (waxiness, wrong jaw, frozen micro-expressions), the guard blends the render back toward the conservative tier. It also runs temporal smoothing so the face doesn't flicker between frames. Fail-safe direction is always <i>toward</i> your real face, never away from it.</p>
 
-      <p><b>4 · Delivery — the virtual camera.</b> The enhanced frames are published to a camera device the OS exposes to every app. On macOS that is a Core Media IO camera extension inside your app bundle (the OBS/Meld/Zoom-SDK distribution path, App Store-eligible); on Windows, a DirectShow/MediaFoundation virtual camera driver. Zero cooperation needed from Zoom, Google, or Microsoft — which matters, because you cannot depend on meeting platforms blessing a third-party face-modifying layer.</p>
+      <p><b>4 · Delivery: the virtual camera.</b> The enhanced frames are published to a camera device the OS exposes to every app. On macOS that is a Core Media IO camera extension inside your app bundle (the OBS/Meld/Zoom-SDK distribution path, App Store-eligible); on Windows, a DirectShow/MediaFoundation virtual camera driver. Zero cooperation needed from Zoom, Google, or Microsoft, which matters, because you cannot depend on meeting platforms blessing a third-party face-modifying layer.</p>
     </div>
 
     <div class="tiers">
       <div class="tier">
-        <div class="t-tag">TIER A · LIGHT — ALWAYS ON</div>
+        <div class="t-tag">TIER A · LIGHT: ALWAYS ON</div>
         <h3>Corrective retouch</h3>
-        <p>Classical AR beauty, applied with the face mesh: even out skin tone, soften under-eyes, tame stray hair strands along the hairline, kill forehead shine, whiten teeth slightly, gentle jaw/eye symmetry. Runs on CPU, adds ~4–8 ms. This is the tier that ships first and never fails.</p>
+        <p>Classical AR beauty, applied with the face mesh: even out skin tone, soften under-eyes, tame stray hair strands along the hairline, kill forehead shine, whiten teeth slightly, gentle jaw/eye symmetry. Runs on CPU. This is the tier that ships first and never fails.</p>
         <ul>
           <li>Feels like "good lighting and a clean shirt"</li>
           <li>No uncanny-valley risk, no identity drift</li>
@@ -155,9 +155,9 @@
         </ul>
       </div>
       <div class="tier">
-        <div class="t-tag">TIER B · HEAVY — THE FLAGSHIP</div>
+        <div class="t-tag">TIER B · HEAVY: THE FLAGSHIP</div>
         <h3>Good-day re-render</h3>
-        <p>A generative portrait model conditioned on your reference preset re-renders your face each frame: the hairstyle and skin from your good day, driven by today's live expressions. Research lineage: LivePortrait (implicit-keypoint animation, ~12–30 ms/frame on GPU) and PSGAN/EleGANt-style makeup transfer from a reference photo. Deep-Live-Cam / DeepFaceLive prove single-image real-time face swapping works on consumer GPUs today.</p>
+        <p>A generative portrait model conditioned on your reference preset re-renders your face each frame: the hairstyle and skin from your good day, driven by today's live expressions. Research lineage: LivePortrait (implicit-keypoint animation) and PSGAN/EleGANt-style makeup transfer from a reference photo. Deep-Live-Cam / DeepFaceLive prove single-image real-time face swapping works on consumer GPUs today.</p>
         <ul>
           <li>Fixes what filters can't: actual bed head, stubble shadow, hangover face</li>
           <li>Needs the identity guard to stay believable</li>
@@ -167,7 +167,7 @@
     </div>
 
     <div class="note">
-      <p><b>Why two tiers, not one:</b> pure retouch (Tier A) can't fix hair, and pure generative re-render (Tier B) is fragile — GPU dependence, occlusion glitches, uncanny-valley drift. Shipping Tier A first gives you a working, unembarrassing product in weeks; Tier B is the demo that goes viral. Same app, same mesh, dialable blend.</p>
+      <p><b>Why two tiers, not one:</b> pure retouch (Tier A) can't fix hair, and pure generative re-render (Tier B) is fragile: GPU dependence, occlusion glitches, uncanny-valley drift. Shipping Tier A first gives you a working, unembarrassing product in weeks. Tier B is the later demo. Same app, same mesh, dialable blend.</p>
     </div>
   </section>
 
@@ -209,7 +209,7 @@
       </table>
     </div>
     <div class="prose">
-      <p><b>Team shape:</b> this is 1–2 engineers for the prototype (strong CV/ML generalist + one platform engineer for the camera extension and driver work — that part is unglamorous, certificate-signing-heavy, and genuinely the schedule risk). The models are open-weight; you're integrating, not training from scratch. Fine-tuning for identity stability can come after the beta proves demand.</p>
+      <p><b>Team shape:</b> this is 1–2 engineers for the prototype (strong CV/ML generalist + one platform engineer for the camera extension and driver work. That part is unglamorous, certificate-signing-heavy, and genuinely the schedule risk). The models are open-weight; you're integrating, not training from scratch. Fine-tuning for identity stability can come after the beta proves demand.</p>
     </div>
   </section>
 
@@ -217,26 +217,26 @@
   <section>
     <div class="sec-head"><span class="sec-no">04</span><h2>What already exists</h2></div>
     <div class="prose">
-      <p>Four clusters of incumbents. None occupies your exact position — "my face, my reference photo, subtly repaired" — but each holds part of the territory.</p>
+      <p>Four clusters of incumbents. None occupies your exact position ("my face, my reference photo, subtly repaired"), but each holds part of the territory.</p>
     </div>
     <div class="tbl-wrap">
       <table>
         <thead><tr><th style="width:22%">Offering</th><th style="width:42%">What it does</th><th>Where it falls short of Bed Head</th></tr></thead>
         <tbody>
-          <tr class="grp"><td colspan="3">CLUSTER 1 — BUILT INTO MEETING APPS</td></tr>
-          <tr><td><b>Zoom</b> — Touch Up My Appearance, Studio Effects</td><td>Slider-based skin smoothing; eyebrow/lip/beard touch-up; Studio Effects (lipstick, brows, beard) in desktop client</td><td>One generic smoothing kernel; no reference photo, no hair fix, no concept of "your good day." Feels like a filter, because it is one.</td></tr>
-          <tr><td><b>Google Meet</b> — portrait touch-up</td><td>Off / Subtle / Smooth skin softening, web and mobile</td><td>Same story: smoothing only, no identity model.</td></tr>
-          <tr><td><b>Microsoft Teams</b> — video effects &amp; filters</td><td>Brightness/soft-focus/color frames; custom-filter apps; avatar mode</td><td>Retouch-lite plus cartoon avatars — nothing between those poles.</td></tr>
-          <tr class="grp"><td colspan="3">CLUSTER 2 — VIRTUAL-CAMERA BEAUTY APPS</td></tr>
+          <tr class="grp"><td colspan="3">CLUSTER 1: BUILT INTO MEETING APPS</td></tr>
+          <tr><td><b>Zoom</b>: Touch Up My Appearance, Studio Effects</td><td>Slider-based skin smoothing; eyebrow/lip/beard touch-up; Studio Effects (lipstick, brows, beard) in desktop client</td><td>One generic smoothing kernel; no reference photo, no hair fix, no concept of "your good day." Feels like a filter, because it is one.</td></tr>
+          <tr><td><b>Google Meet</b>: portrait touch-up</td><td>Off / Subtle / Smooth skin softening, web and mobile</td><td>Same story: smoothing only, no identity model.</td></tr>
+          <tr><td><b>Microsoft Teams</b>: video effects &amp; filters</td><td>Brightness/soft-focus/color frames; custom-filter apps; avatar mode</td><td>Retouch-lite plus cartoon avatars, with nothing between those poles.</td></tr>
+          <tr class="grp"><td colspan="3">CLUSTER 2: VIRTUAL-CAMERA BEAUTY APPS</td></tr>
           <tr><td><b>Filteronme</b> <span class="dim">(free, Win/Mac)</span></td><td>Desktop virtual camera with beauty filters for any meeting app</td><td>Preset sliders, not your face; no generative tier, no hair.</td></tr>
           <tr><td><b>Streamfog</b> / <b>LookGood Live</b> / <b>GlowCam</b></td><td>OBS/browser-based real-time smoothing, makeup, backgrounds</td><td>Same generic-filter ceiling; aimed at streamers more than 9 a.m. standup.</td></tr>
           <tr><td><b>CyberLink YouCam / PerfectCam</b></td><td>The veteran: live makeup, skin tools, background replace over Zoom/Teams</td><td>Old-gen AR: makeup stickers and blur, no reference-image identity, dated UX.</td></tr>
           <tr><td><b>Fineshare FineCam</b></td><td>AI virtual camera: enhancement, backgrounds, phone-as-webcam</td><td>"Enhancement" = color/sharpness tuning; no face model doing repair.</td></tr>
-          <tr class="grp"><td colspan="3">CLUSTER 3 — GENERATIVE FACE MACHINES</td></tr>
-          <tr><td><b>xpression camera</b></td><td>Real-time generative face replacement from any photo, works as a virtual camera in meetings</td><td>Closest technically — and proof the concept performs. But it's full character replacement (celebrities, memes), not "me, maintained." No restraint layer, and the market knows it as a toy/impersonation tool.</td></tr>
-          <tr><td><b>Avatarify</b> <span class="dim">(2020-era)</span></td><td>First-order-motion avatars for Zoom; famously viral</td><td>Abandoned and jittery; historically significant, commercially dead — a warning about quality bar, and evidence of demand.</td></tr>
+          <tr class="grp"><td colspan="3">CLUSTER 3: GENERATIVE FACE MACHINES</td></tr>
+          <tr><td><b>xpression camera</b></td><td>Real-time generative face replacement from any photo, works as a virtual camera in meetings</td><td>Closest technically, and proof the concept performs. But it's full character replacement (celebrities, memes), not "me, maintained." No restraint layer, and the market knows it as a toy/impersonation tool.</td></tr>
+          <tr><td><b>Avatarify</b> <span class="dim">(2020-era)</span></td><td>First-order-motion avatars for Zoom; famously viral</td><td>Abandoned and jittery; historically significant, commercially dead: a warning about the quality bar, and evidence of demand.</td></tr>
           <tr><td><b>Deep-Live-Cam / DeepFaceLive</b> <span class="dim">(open source)</span></td><td>Real-time face swap from one photo (DLC) or trained models (DFL), webcam → stream</td><td>The raw engine for Tier B exists free today. Zero productization: no identity guard, no retouch tier, consent checks are your job. Your opportunity is exactly the layer on top.</td></tr>
-          <tr class="grp"><td colspan="3">CLUSTER 4 — SDKs YOU'D BUY INSTEAD OF BUILDING</td></tr>
+          <tr class="grp"><td colspan="3">CLUSTER 4: SDKs YOU'D BUY INSTEAD OF BUILDING</td></tr>
           <tr><td><b>Banuba Face AR</b></td><td>Face tracking + 28 morphs, 16 makeup types, beauty; desktop + mobile + web SDK</td><td>Covers Tier A out of the box (license fees); no reference-photo generative tier.</td></tr>
           <tr><td><b>DeepAR</b></td><td>Similar SDK scope (11 morphs, 10 makeup types), web SDK strength</td><td>Same ceiling: excellent Tier A, no Tier B.</td></tr>
           <tr><td><b>FaceUnity</b></td><td>Beauty + face tracking SDK, strong in Asian markets, desktop support</td><td>Tier A again; integration is build-vs-buy for your phase P0–P2.</td></tr>
@@ -244,7 +244,7 @@
       </table>
     </div>
     <div class="prose">
-      <p><b>NVIDIA Broadcast</b> deserves its own line: Studio Effects (skin smoothing, eye contact) is the best free Tier A on the market — but it's welded to RTX GPUs and Windows, does no hair/generative work, and NVIDIA gives it away to sell cards. It defines the quality floor you must beat with the reference-photo concept, not with smoother smoothing.</p>
+      <p><b>NVIDIA Broadcast</b> deserves its own line: Studio Effects (skin smoothing, eye contact) is a free Tier A, but it is welded to RTX GPUs and Windows, does no hair/generative work, and NVIDIA gives it away to sell cards. It defines the quality floor you must beat with the reference-photo concept, not with smoother smoothing.</p>
       <p><b>Snap Camera</b> is the cautionary tale: huge distribution (Snapchat lenses on every video app, 2019–2023), shut down January 2023, and the graveyard of "alternatives" sites it left behind is basically the Cluster 2 market. Demand for filters-in-meetings is real; Snap monetized none of it. Charge from day one.</p>
     </div>
   </section>
@@ -253,22 +253,22 @@
   <section>
     <div class="sec-head"><span class="sec-no">05</span><h2>Where Bed Head sits</h2></div>
     <div class="prose">
-      <p>Picture an axis from <i>untouched camera</i> to <i>full avatar</i>. The built-ins cluster at "slightly softened." xpression camera and the deepfake tools live at "someone else entirely." The middle — <b>recognizably you, but maintained, from your own reference photo</b> — is unoccupied by anything with a quality bar above novelty.</p>
-      <p><b>Differentiators that are hard to copy quickly:</b> the identity guard (nobody ships drift-capped rendering); one-photo onboarding tuned for "use my Tuesday selfie, not a studio headshot"; the two-tier fail-safe design; and privacy positioning (on-device reference photo in a market where "deepfake app" otherwise screams cloud upload).</p>
-      <p><b>Honest risks:</b> Apple or Zoom could ship "reference-photo touch-up" natively and compress this market overnight — so speed and brand (the name is genuinely great) matter. Tier B needs a GPU, which excludes low-end laptops (Tier A covers them). And the word "deepfake" will follow you into every app-store review and enterprise procurement conversation; the consent-first architecture in §06 isn't optional garnish, it's the difference between "beauty tool" and "impersonation tool" in the eyes of platforms, press, and law.</p>
+      <p>Picture an axis from <i>untouched camera</i> to <i>full avatar</i>. The built-ins cluster at "slightly softened." xpression camera and the deepfake tools live at "someone else entirely." The middle (<b>recognizably you, but maintained, from your own reference photo</b>) is unoccupied by anything with a quality bar above novelty.</p>
+      <p><b>Differentiators that are hard to copy quickly:</b> the identity guard (drift-capped rendering); one-photo onboarding tuned for "use my Tuesday selfie, not a studio headshot"; the two-tier fail-safe design; and privacy positioning (on-device reference photo in a market where "deepfake app" otherwise screams cloud upload).</p>
+      <p><b>Honest risks:</b> Apple or Zoom could ship "reference-photo touch-up" natively and compress this market overnight, so speed and brand (the name is genuinely great) matter. Tier B needs a GPU, which excludes low-end laptops (Tier A covers them). And the word "deepfake" will follow you into every app-store review and enterprise procurement conversation; the consent-first architecture in §06 isn't optional garnish, it's the difference between "beauty tool" and "impersonation tool" in the eyes of platforms, press, and law.</p>
     </div>
   </section>
 
   <!-- ======================= 06 ETHICS & LAW ======================= -->
   <section>
-    <div class="sec-head"><span class="sec-no">06</span><h2>Risks, ethics, law — read before building</h2></div>
+    <div class="sec-head"><span class="sec-no">06</span><h2>Risks, ethics, law: read before building</h2></div>
     <div class="prose">
       <ul>
         <li><b>Use it only on your own face.</b> The product's entire legal and ethical posture rests on self-enhancement. The moment the marketing winks at "try it with a photo of your coworker," you're an impersonation tool: banned by meeting-platform policies and, in several US states plus the UK's Online Safety Act era, specifically regulated. <b>Reference photos may come from the camera or the gallery</b> (policy changed Oct 2026), but every reference must pass an on-device ArcFace admission check against the live face on camera: a photo of someone else is rejected before it is ever used (cosine similarity gate, calibrated same-person 0.73+ vs cross-person below 0.1). Once running, Tier B output is drift-capped against the admitted reference and fails safe to Tier A.</li>
-        <li><b>US federal law moved in 2025.</b> The TAKE IT DOWN Act (signed May 2025) criminalizes publishing non-consensual intimate deepfakes and forces platforms to process takedowns. You're not building that — but app stores and payment processors now pattern-match "deepfake" hard. Ship consent-first: liveness capture, on-device storage, clear disclosure.</li>
+        <li><b>US federal law moved in 2025.</b> The TAKE IT DOWN Act (signed May 2025) criminalizes publishing non-consensual intimate deepfakes and forces platforms to process takedowns. You're not building that, but app stores and payment processors now pattern-match "deepfake" hard. Ship consent-first: liveness capture, on-device storage, clear disclosure.</li>
         <li><b>Disclosure etiquette is a product feature.</b> An optional status-dot overlay and instant kill switch protect users socially ("I'm on Bed Head, level 1") and protect you reputationally. Enterprise buyers will ask; make the answer a checkbox.</li>
-        <li><b>Dysmorphia guardrail.</b> A filter whose pitch is "you look bad today" can quietly worsen users' relationship with their own face. Keep intensities capped, keep the off switch glorious, and don't auto-apply — the user taps in each call. Small decisions, big long-term brand difference between "tool I like" and "tool I'm ashamed of."</li>
-        <li><b>Technical trust.</b> Failsafe to real camera on any anomaly; never upload frames; the reference preset encrypted locally and deleted on uninstall. Put those three sentences on the marketing page — they convert in this category.</li>
+        <li><b>Dysmorphia guardrail.</b> A filter whose pitch is "you look bad today" can quietly worsen users' relationship with their own face. Keep intensities capped, keep the off switch glorious, and don't auto-apply. The user taps in each call. Small decisions, big long-term brand difference between "tool I like" and "tool I'm ashamed of."</li>
+        <li><b>Technical trust.</b> If tracking drops, the frame passes through untouched; frames are never uploaded; the reference preset stays on the device. Put those three sentences on the marketing page.</li>
       </ul>
     </div>
   </section>
@@ -278,12 +278,12 @@
     <div class="sec-head"><span class="sec-no">07</span><h2>What to do next</h2></div>
     <div class="prose">
       <ol style="margin-left:20px">
-        <li style="margin-bottom:8px"><b>Weekend proof:</b> install OBS + Deep-Live-Cam with a good photo of yourself; join a test meeting off a virtual camera. You'll feel both the magic and the waxiness — that gap is the product.</li>
+        <li style="margin-bottom:8px"><b>Weekend proof:</b> install OBS + Deep-Live-Cam with a good photo of yourself; join a test meeting off a virtual camera. You'll feel both the magic and the waxiness. That gap is the product.</li>
         <li style="margin-bottom:8px"><b>P0 spike:</b> 2–4 weeks, Python + MediaPipe + OpenCV retouch, pyvirtualcam output. Decision gate: does the A/B side-by-side make people want it?</li>
-        <li style="margin-bottom:8px"><b>Parallel:</b> lock the name/trademark early ("Bed Head" is evocative; check cosmetics conflicts — there is a haircare brand of the same name, which matters if you expand to consumer beauty).</li>
+        <li style="margin-bottom:8px"><b>Parallel:</b> lock the name/trademark early ("Bed Head" is evocative; check cosmetics conflicts: there is a haircare brand of the same name, which matters if you expand to consumer beauty).</li>
         <li style="margin-bottom:8px"><b>Then:</b> Tier B on GPU, identity guard, Mac alpha via CMIO extension, TestFlight-style beta with 50 remote workers.</li>
       </ol>
-      <p>The one-sentence version: <b>the parts are proven, the gap is real, the moat is restraint</b> — the identity guard that keeps the render honest is what turns commodity deepfake tech into a product people trust on a Monday standup.</p>
+      <p>The one-sentence version: <b>the parts are proven, the gap is real, the moat is restraint</b>. The identity guard that keeps the render honest is what turns commodity deepfake tech into a product people trust on a Monday standup.</p>
     </div>
   </section>
 
@@ -291,25 +291,25 @@
   <section>
     <div class="sec-head"><span class="sec-no">08</span><h2>Sources</h2></div>
     <ul class="src-list">
-      <li><b>MediaPipe Face Landmarker</b> — 478-point real-time face mesh, cross-platform · <a href="https://developers.google.com/edge/mediapipe/solutions/vision/face_landmarker">developers.google.com</a></li>
-      <li><b>LivePortrait</b> — implicit-keypoint portrait animation, real-time GPU · <a href="https://arxiv.org/abs/2407.03168">arXiv 2407.03168</a> · Replicate/commodity APIs exist</li>
-      <li><b>PersonaLive</b> — diffusion-based streaming portrait animation (state of the art, Dec 2025) · <a href="https://arxiv.org/">arXiv</a></li>
-      <li><b>Deep-Live-Cam</b> — open-source one-photo real-time face swap · <a href="https://github.com/hacksider/Deep-Live-Cam">github.com/hacksider</a></li>
-      <li><b>DeepFaceLive</b> — real-time face swap for streaming/video calls · deepfakevfx.com / SourceForge mirror</li>
-      <li><b>PSGAN</b> / <b>EleGANt</b> — reference-photo makeup transfer (research lineage) · <a href="https://arxiv.org/">arXiv</a> · <a href="https://www.ecva.net/">ECVA</a></li>
-      <li><b>Apple CMIO camera extensions</b> — virtual-camera distribution path on macOS · <a href="https://developer.apple.com/">developer.apple.com</a></li>
-      <li><b>Zoom Touch Up / Studio Effects</b>, <b>Meet portrait touch-up</b> (Workspace Updates, Mar 2024), <b>Teams video effects</b> — official docs/support pages</li>
+      <li><b>MediaPipe Face Landmarker</b>: 478-point real-time face mesh, cross-platform · <a href="https://developers.google.com/edge/mediapipe/solutions/vision/face_landmarker">developers.google.com</a></li>
+      <li><b>LivePortrait</b>: implicit-keypoint portrait animation, real-time GPU · <a href="https://arxiv.org/abs/2407.03168">arXiv 2407.03168</a> · Replicate/commodity APIs exist</li>
+      <li><b>PersonaLive</b>: diffusion-based streaming portrait animation · <a href="https://arxiv.org/">arXiv</a></li>
+      <li><b>Deep-Live-Cam</b>: open-source one-photo real-time face swap · <a href="https://github.com/hacksider/Deep-Live-Cam">github.com/hacksider</a></li>
+      <li><b>DeepFaceLive</b>: real-time face swap for streaming/video calls · deepfakevfx.com / SourceForge mirror</li>
+      <li><b>PSGAN</b> / <b>EleGANt</b>: reference-photo makeup transfer (research lineage) · <a href="https://arxiv.org/">arXiv</a> · <a href="https://www.ecva.net/">ECVA</a></li>
+      <li><b>Apple CMIO camera extensions</b>: virtual-camera distribution path on macOS · <a href="https://developer.apple.com/">developer.apple.com</a></li>
+      <li><b>Zoom Touch Up / Studio Effects</b>, <b>Meet portrait touch-up</b> (Workspace Updates, Mar 2024), <b>Teams video effects</b>: official docs/support pages</li>
       <li><b>NVIDIA Broadcast Studio Effects + Eye Contact</b> · <a href="https://www.nvidia.com/en-us/geforce/news/jan-2023-nvidia-broadcast-update/">nvidia.com</a></li>
-      <li><b>xpression camera</b> — real-time generative video-chat transformation · Microsoft Store / Product Hunt listing</li>
+      <li><b>xpression camera</b>: real-time generative video-chat transformation · Microsoft Store / Product Hunt listing</li>
       <li><b>Banuba vs DeepAR</b> head-to-head (morphs/makeup counts, desktop support) · <a href="https://www.banuba.com/blog/banuba-face-filter-sdk-vs-deepar-tested-head-to-head">banuba.com</a></li>
-      <li><b>Filteronme · Streamfog · LookGood Live · CyberLink YouCam/PerfectCam · Fineshare FineCam · OBS virtual camera</b> — product pages, Oct 2026</li>
+      <li><b>Filteronme · Streamfog · LookGood Live · CyberLink YouCam/PerfectCam · Fineshare FineCam · OBS virtual camera</b>: product pages, Oct 2026</li>
       <li><b>Snap Camera shutdown (Jan 25, 2023)</b> and alternatives coverage · filteronme.com / streamfog.com</li>
-      <li><b>TAKE IT DOWN Act</b> — signed May 19, 2025; NCII/deepfake takedown obligations · <a href="https://www.jdsupra.com/">JD Supra</a> summary; state-law tracker aiprise.com</li>
+      <li><b>TAKE IT DOWN Act</b>: signed May 19, 2025; NCII/deepfake takedown obligations · <a href="https://www.jdsupra.com/">JD Supra</a> summary; state-law tracker aiprise.com</li>
     </ul>
 
     <div class="colophon">
       <div>Bed Head · Product &amp; Engineering Brief v0.1</div>
-      <div>Prepared 8 Oct 2026 · Research snapshot via live web search — pricing/features current as of date</div>
+      <div>Prepared 8 Oct 2026 · Research snapshot via live web search. Pricing and features current as of that date.</div>
     </div>
   </section>
 
