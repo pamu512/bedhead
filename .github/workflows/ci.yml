@@ -90,7 +90,7 @@ jobs:
       - name: Build the one-file binary
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[guard]" pyinstaller
+          python -m pip install -e ".[guard]" pyinstaller -c constraints.txt
           pyinstaller bedhead.spec --noconfirm
 
       - name: Clean-machine smoke (no venv, fresh HOME)
@@ -115,7 +115,7 @@ jobs:
       - name: Build binary + pkg
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[guard]" pyinstaller
+          python -m pip install -e ".[guard]" pyinstaller -c constraints.txt
           pyinstaller bedhead.spec --noconfirm
           env -i HOME=$(mktemp -d) PATH=/usr/bin:/bin ./dist/bedhead --version
           bash scripts/build_mac_installer.sh
@@ -146,7 +146,7 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[guard]" pyinstaller
+          python -m pip install -e ".[guard]" pyinstaller -c constraints.txt
           pyinstaller bedhead.spec --noconfirm
           ./dist/bedhead.exe --version
 
