@@ -8,10 +8,10 @@
 
 ## Status
 
-P0.5 (Python). Tier A retouch rebuilt on a research-grade quality engine, plus the parity features (background modes, person relight, eye light); the generative "good-day re-render" (Tier B) is a later phase; see [`docs/ROADMAP.md`](docs/ROADMAP.md).
+P0.5 (Python). Tier A retouch rebuilt on a research-grade quality engine, plus the parity features (background modes, person relight, eye light) and a guarded Tier B generative spike (not real-time; see below); see [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
-- ✅ MediaPipe 478-point face tracking (VIDEO mode, ~5 ms/frame on CPU), one-euro smoothed
-- ✅ Quality-engine retouch: guided-filter frequency separation, LAB pipeline, local-percentile shine, hysteresis teeth gate, selective sharpening (~9 ms/frame for all face effects at 720p on Apple Silicon)
+- ✅ MediaPipe 478-point face tracking (VIDEO mode, ~5 ms/frame standalone measurement; ~31-45 ms full pipeline on the live bench), one-euro smoothed
+- ✅ Quality-engine retouch: guided-filter frequency separation, LAB pipeline, guided-filter-base shine compression, hysteresis teeth gate, selective sharpening (~9 ms/frame for the face-ROI effects at 720p on Apple Silicon)
 - ✅ Reference-guided: identity-gated gallery reference, autotune, continuous ambient adaptation, Reinhard color match (~4.6 ms/frame, cached reference stats)
 - ✅ Measured under-eye correction: landmark-keyed tear-trough band (convex-hull geometry, below-lash-line start), darkness-proportional dodge
 - ✅ Subject pop: continuous background darken from live-vs-reference background L* (studio preset arms it; LookTracker adapts it)
@@ -22,7 +22,7 @@ P0.5 (Python). Tier A retouch rebuilt on a research-grade quality engine, plus t
 - ✅ Eye light: landmark-gated brightness for an awake look
 - ✅ 8-metric quality benchmark (bedhead/benchmark.py): under-eye gap, texture retention, color dE, exposure, subject pop, saturation, temporal pump, latency, all measured live against your reference photo
 - ✅ Identity preservation verified: 43/43 VidTIMIT subjects, 3,512 frames, retouched faces still match their profile picture (mean SFace cosine 0.83 vs 0.363 threshold; no frame degrades below its original)
-- ✅ Virtual camera output via OBS (macOS) or native (Windows)
+- ✅ Virtual camera output via OBS (macOS: obs-mac-virtualcam; Windows: pyvirtualcam on the OBS virtual camera driver that ships with OBS Studio)
 - ✅ Preview window with A/B toggle + keyboard dials (incl. k/i/b/n for the new effects)
 - ✅ Live control panel (`bedhead.panel`) with preset hot-reload
 - ✅ Headless test suite + CI (ruff + pytest, 3.10–3.13)
@@ -89,7 +89,7 @@ bedhead --reference you.jpg --auto-match --tier-b
 python -m bedhead.panel
 ```
 
-First run downloads two MediaPipe models (~20 MiB total: face landmarker 3.7 MiB + selfie segmenter 16.4 MiB) into your user cache directory (`~/Library/Caches/bedhead` on macOS, `~/.cache/bedhead` on Linux), each verified against a pinned sha256. The segmenter is only fetched when a segmentation feature (background/studio light) is first used.
+First run downloads the MediaPipe face-landmarker model (3.7 MiB) into your user cache directory (`~/Library/Caches/bedhead` on macOS, `~/.cache/bedhead` on Linux), verified against a pinned sha256. The selfie segmenter (16.4 MiB) is fetched on first use of a segmentation feature (background/studio light/subject pop, or clothes tidy-up, which is on by default -- `--no-clothes` skips it, so a plain `bedhead` run downloads both models).
 
 ### macOS virtual camera setup (OBS path)
 
@@ -134,7 +134,7 @@ Tier B features take a reference photo, and it can come from your gallery:
 bedhead --reference ~/Pictures/good-day.jpg
 ```
 
-The reference is only used after it passes an on-device admission check: bedhead samples ~15 live frames, embeds the face on camera and the face in the photo (ArcFace), and requires cosine similarity >= 0.40 (calibrated: same-person photos score 0.73+, different people score below 0.1). A photo of someone else is rejected and the run continues Tier-A-only. Requires the `guard` extra: `pip install 'bedhead[guard]'`.
+The reference is only used after it passes an on-device admission check: bedhead samples ~15 live frames, embeds the face on camera and the face in the photo (ArcFace), and requires cosine similarity >= 0.40 (calibrated: same-person photos score 0.73+, a measured foreign face scored 0.10 (just at the 0.40 gate)). A photo of someone else is rejected and the run continues Tier-A-only. Requires the `guard` extra: `pip install 'bedhead[guard]'`.
 
 **Tier B spike (guarded generative re-render)**: with an admitted reference, `--tier-b` re-renders your face from that reference (IN Swapper). The guard contract is enforced in code: only an admitted reference can ever be registered as the identity source, output identity is re-checked every 10 frames against the reference (drift cap 0.35; measured 0.95 on a genuine reference), and any violation fails safe to Tier A. The `g` key blends Tier A <-> Tier B. Perf is CoreML-assisted (~64-76 ms/frame on Apple Silicon CPU+ANE partitioning; pure CPU is 205 ms; fp16 conversion is a measured regression on this CPU). Not real-time yet: that needs a full ANE/GPU engine port (P1). One-time model: place `inswapper_128.onnx` in the model cache (see `bedhead/models.py` MODEL_DIR).
 
@@ -144,7 +144,7 @@ With `--auto-match`, the admitted reference also tunes the Tier A effects: bedhe
 bedhead --reference ~/Pictures/good-day.jpg --auto-match
 ```
 
-Auto-match also enables **reference color match** (the `m` key dials it live): a Reinhard LAB statistics transfer that moves your face's color toward the reference photo's, inside the face oval only, chroma-clamped so skin can never shift into unnatural hues. Measured on a 0.55x-exposure "bad webcam" frame, it closes 45% of the total look gap on top of the Tier A stack, while identity drift stays at 0.90 similarity (cap 0.35), because the transfer changes color statistics only, never geometry.
+Auto-match also enables **reference color match** (the `m` key dials it live): a Reinhard LAB statistics transfer that moves your face's color toward the reference photo's, inside the face oval only, chroma-clamped so skin can never shift into unnatural hues. Measured on a 0.55x-exposure "bad webcam" frame, it closes 42% of the total look gap on top of the Tier A stack (45% in the first measurement, 42% on the remeasure), while identity drift stays at 0.90 similarity (cap 0.35), because the transfer changes color statistics only, never geometry.
 
 ## How it works
 ```
@@ -156,7 +156,7 @@ webcam ──► MediaPipe FaceLandmarker ──► Tier A retoucher ──► v
 | Stage | Module | What it does | Fail-safe |
 |-------|--------|--------------|-----------|
 | Track | `bedhead/tracker.py` | 478-point mesh + blendshapes (jawOpen gates teeth) | No face → frame passes through untouched |
-| Retouch | `bedhead/retoucher.py` | Feathered, landmark-masked effects; all strengths 0–1, capped | Any effect at 0 → code path skipped |
+| Retouch | `bedhead/retoucher.py` | Feathered, landmark-masked effects; all strengths 0–1, capped | Effects at 0 skip their path (feature sharpening still runs at low strength while the face is retouched) |
 | Deliver | `bedhead/sinks.py` | Preview window and/or pyvirtualcam sink | vcam open fails → preview-only, never crash |
 | Control | `bedhead/cli.py` + `panel.py` | Keyboard dials + Tk sliders; preset JSON hot-reload | — |
 

@@ -173,7 +173,10 @@ def test_blend_mixes_frames(setup):
     tier_a = np.full((128, 128, 3), 100, np.uint8)
     out, status = tb.process(live, tier_a, blend=0.5)
     assert status == "ok"
-    # frequency composite: low-freq (flat areas) takes the swap's value,
-    # high-freq texture from raw (none on flat frames); final blend mixes
-    # with tier_a at the face center: 0.5*(100) + 0.5*(200) = 150
-    assert abs(int(out[64, 64, 0]) - 150) <= 2
+    # blend scales the LOW-frequency swap contribution only (no RGB mixing,
+    # which would cancel high-frequency phase): flat frame, raw=0, swap=200,
+    # blend 0.5 -> low = 0*(1-0.5) + 200*0.5 = 100 at the face center
+    assert abs(int(out[64, 64, 0]) - 100) <= 2
+    # full blend -> low = 200
+    out_full, _ = tb.process(live, tier_a, blend=1.0)
+    assert abs(int(out_full[64, 64, 0]) - 200) <= 2

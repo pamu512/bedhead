@@ -129,13 +129,15 @@ class TierB:
         if swapped.shape != aimg.shape:
             swapped = cv2.resize(swapped, (aimg.shape[1], aimg.shape[0]),
                                  interpolation=cv2.INTER_LINEAR)
-        composed = frequency_composite(aimg, swapped, blend=1.0)
+        composed = frequency_composite(
+            aimg, swapped,
+            blend=float(np.clip(blend, 0.0, 1.0)) * self._blend_scale,
+        )
         swapped = paste_face(frame_bgr, composed, M)
         self.last_swap_ms = (time.perf_counter() - t0) * 1000
 
         # drift check every N frames (embedding of the swapped output vs ref)
         self._frames_since_check += 1
-        blend_now = float(np.clip(blend, 0.0, 1.0)) * self._blend_scale
         if self._frames_since_check >= DRIFT_CHECK_INTERVAL:
             self._frames_since_check = 0
             emb = self.guard.embed(swapped)
@@ -145,28 +147,20 @@ class TierB:
             self._last_drift_sim = sim
             if sim < DRIFT_CAP:
                 # progressive fail-safe: halve the blend (toward Tier A) on
-                # each violation; full-disable only after repeated strikes
+                # each violation; full-disable only after repeated strikes.
+                # Applied by scaling the LOW-FREQUENCY swap contribution next
+                # frame (never by RGB-averaging, which cancels HF phase).
                 self._drift_strikes += 1
                 self._blend_scale = max(0.125, self._blend_scale / 2.0)
-                blend_now = float(np.clip(blend, 0.0, 1.0)) * self._blend_scale
                 if self._drift_strikes >= 3:
                     self._disabled_reason = (
                         f"drift {sim:.3f} < {DRIFT_CAP} x{self._drift_strikes}"
                     )
                     return tier_a_out, f"disabled:{self._disabled_reason}"
-                if blend_now <= 0:
-                    return tier_a_out, (
-                        f"drift:sim {sim:.2f}, Tier B blend cut to {self._blend_scale:.2f}x"
-                    )
             else:
                 self._drift_strikes = 0
 
-        if blend_now >= 0.999:
-            return swapped, "ok"
-        mixed = (
-            tier_a_out.astype(np.float32) * (1 - blend_now) + swapped.astype(np.float32) * blend_now
-        ).astype(np.uint8)
-        return mixed, "ok"
+        return swapped, "ok"
 
     @property
     def last_drift_sim(self) -> float:

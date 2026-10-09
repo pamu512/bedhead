@@ -130,6 +130,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         "intensity": 0.35,
         "background_strength": 0.9,
         "background_mode": "dark",
+        "background_darken": 0.85,  # subject pop: reference-targeted darken
     },
 }
 

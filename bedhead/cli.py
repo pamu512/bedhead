@@ -155,7 +155,7 @@ def main(argv: list[str] | None = None) -> int:
     reference_img: np.ndarray | None = None  # the admitted reference photo
     cm_cache: dict = {}  # reference-stats cache for color_match (per run)
     tier_b = None  # TierB engine, only when --tier-b and reference admitted
-    tier_b_blend = 1.0
+    tier_b_blend = 0.0  # off by default; g cycles 0 -> .25 -> .5 -> .75 -> 1 -> 0
 
     # --- reference photo admission (gallery upload allowed, identity-gated) ---
     if args.reference:
@@ -255,7 +255,11 @@ def main(argv: list[str] | None = None) -> int:
     segmenter: Segmenter | None = None
 
     def _seg_wanted(p: Preset) -> bool:
-        return (p.background_strength > 0 and p.background_mode != "off") or p.studio_light > 0
+        return (
+            (p.background_strength > 0 and p.background_mode != "off")
+            or p.studio_light > 0
+            or p.background_darken > 0  # subject pop needs the person mask
+        )
 
     def _get_segmenter() -> Segmenter | None:
         """Lazily construct the segmenter (downloads model on first use)."""
@@ -432,6 +436,8 @@ def main(argv: list[str] | None = None) -> int:
                     preset.color_match = (preset.color_match + 0.2) % 1.2
                 elif key in ("g", "G"):
                     tier_b_blend = (tier_b_blend + 0.25) % 1.25 if tier_b is not None else 0.0
+                    if tier_b_blend > 1.0:
+                        tier_b_blend = 0.0  # wrap 1.00 back to off, not 1.25-era legacy
                 elif key in ("r", "R"):
                     show_reference_pip = not show_reference_pip
                 elif key in ("b", "B"):

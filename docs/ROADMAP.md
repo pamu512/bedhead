@@ -10,7 +10,7 @@ Shipped and measured:
 
 - [x] MediaPipe 478-pt tracking (VIDEO mode, one-euro smoothed, ~5 ms/frame)
 - [x] Quality-engine retouch: guided-filter frequency separation, LAB
-      pipeline, local-percentile shine, hysteresis teeth gate (~9 ms/frame)
+      pipeline, guided-filter-base shine compression, hysteresis teeth gate (~9 ms/frame)
 - [x] Reference-guided: identity-gated gallery reference (ArcFace cosine
       >= 0.40 admission), autotune, continuous ambient adaptation
       (LookTracker), Reinhard color match, face_lift exposure closer
@@ -22,7 +22,7 @@ Shipped and measured:
       proportional dodge, measured (was a 28-px no-op mask)
 - [x] Detail boost + vibrance (face-oval ROI): ~114-125% HF retention
 - [x] Clothes tidy-up, preview A/B + dials + reference PiP, Tk panel
-- [x] Virtual camera sink (OBS macOS / native Windows)
+- [x] Virtual camera sink (macOS: obs-mac-virtualcam; Windows: pyvirtualcam on the OBS driver shipped with OBS Studio)
 - [x] Headless suite (222 tests) + CI (ruff + pytest, 3.10-3.13) + binary
       build with clean-machine smoke ([docs/PACKAGING.md](PACKAGING.md))
 - [x] 8-metric quality benchmark (`bedhead/benchmark.py`) vs
