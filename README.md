@@ -209,6 +209,8 @@ bedhead/
 │   ├── freqblend.py    # frequency-separable Tier B composite
 │   ├── benchmark.py    # 8-metric quality benchmark
 │   ├── aelock.py       # native camera exposure lock (external cams)
+│   ├── clothes.py      # garment tidy-up (crease soften, stain fade, logo blur)
+│   ├── keys.py         # key-binding helpers shared by preview/panel
 │   ├── sinks.py        # preview + virtual camera
 │   ├── panel.py        # Tk live control panel
 │   ├── config.py       # Preset dataclass + named presets

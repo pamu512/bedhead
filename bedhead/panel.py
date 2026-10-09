@@ -44,6 +44,7 @@ class Panel(tk.Tk):
             ("color_match", "Color match (reference)"),
             ("vibrance", "Vibrance (dull-pixel color)"),
             ("detail_boost", "Detail boost (sharpness)"),
+            ("face_lift", "Face lift (dim-room exposure)"),
             ("studio_light", "Studio light (person relight)"),
             ("background_darken", "Background darken (subject pop)"),
             ("eye_light", "Eye light (awake)"),
