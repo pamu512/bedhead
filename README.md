@@ -27,7 +27,9 @@ P0.5 (Python). Tier A retouch rebuilt on a research-grade quality engine, plus t
 - ⏳ Tier B generative re-render (LivePortrait-class; research says Core ML/ANE only, not CPU)
 - 🧪 Tier B spike SHIPPED (guarded): `bedhead --reference you.jpg --tier-b` runs IN Swapper
   under the full guard contract (admitted-reference-only, drift-capped every 10 frames,
-  fail-safe to Tier A, `g` blend dial). CPU ~74 ms/frame; real-time needs GPU/ANE (P1).
+  fail-safe to Tier A, `g` blend dial). CoreML-assisted ~64-76 ms/frame on
+  Apple Silicon (CPU-only 205 ms; fp16 a measured regression); real-time
+  needs a full ANE/GPU engine port (P1).
 - ⏳ Identity guard runtime drift cap (admission check already shipped, see below)
 - ⏳ Native macOS app + CMIO camera extension
 
@@ -102,7 +104,7 @@ bedhead --reference ~/Pictures/good-day.jpg
 
 The reference is only used after it passes an on-device admission check: bedhead samples ~15 live frames, embeds the face on camera and the face in the photo (ArcFace), and requires cosine similarity >= 0.40 (calibrated: same-person photos score 0.73+, different people score below 0.1). A photo of someone else is rejected and the run continues Tier-A-only. Requires the `guard` extra: `pip install 'bedhead[guard]'`.
 
-**Tier B spike (guarded generative re-render)**: with an admitted reference, `--tier-b` re-renders your face from that reference (IN Swapper). The guard contract is enforced in code: only an admitted reference can ever be registered as the identity source, output identity is re-checked every 10 frames against the reference (drift cap 0.35; measured 0.95 on a genuine reference), and any violation fails safe to Tier A. The `g` key blends Tier A <-> Tier B. CPU cost is ~74 ms/frame (not real-time; the P1 GPU/ANE port is the fix), so this ships as a spike behind a flag. One-time model: place `inswapper_128.onnx` in the model cache (see `bedhead/models.py` MODEL_DIR).
+**Tier B spike (guarded generative re-render)**: with an admitted reference, `--tier-b` re-renders your face from that reference (IN Swapper). The guard contract is enforced in code: only an admitted reference can ever be registered as the identity source, output identity is re-checked every 10 frames against the reference (drift cap 0.35; measured 0.95 on a genuine reference), and any violation fails safe to Tier A. The `g` key blends Tier A <-> Tier B. Perf is CoreML-assisted (~64-76 ms/frame on Apple Silicon CPU+ANE partitioning; pure CPU is 205 ms; fp16 conversion is a measured regression on this CPU). Not real-time yet: that needs a full ANE/GPU engine port (P1). One-time model: place `inswapper_128.onnx` in the model cache (see `bedhead/models.py` MODEL_DIR).
 
 With `--auto-match`, the admitted reference also tunes the Tier A effects: bedhead measures the exposure/warmth/sharpness gap between the live feed and the reference photo and derives `soft_light` / `studio_light` / `under_eye` / `skin` strengths that move your live look toward the photo's look (classical effects only, nothing generative):
 
