@@ -34,6 +34,7 @@ class Preset:
 
     intensity: float = 0.7          # global dial (Off..Subtle..Full rescue maps to 0/0.4/0.8)
     skin: float = 0.6               # mesh-aware skin smoothing
+    skin_texture: float = 0.35      # pore/texture keep in smoothing (1 = keep all detail)
     under_eye: float = 0.5          # brighten lower-orbit band
     shine: float = 0.6              # tame oily highlights on skin
     teeth: float = 0.35             # whiten inside inner lips when mouth is open
@@ -105,7 +106,8 @@ class Preset:
         bg = f"bg={self.background_mode}:{self.background_strength:.2f}" \
             if self.background_strength > 0 else "bg=off"
         return (
-            f"intensity={self.intensity:.2f} skin={self.skin:.2f} under_eye={self.under_eye:.2f} "
+            f"intensity={self.intensity:.2f} skin={self.skin:.2f} skin_texture={self.skin_texture:.2f} "
+            f"under_eye={self.under_eye:.2f} "
             f"shine={self.shine:.2f} teeth={self.teeth:.2f} hairline={self.hairline:.2f} "
             f"clothes={self.clothes:.2f} stain={self.stain:.2f} logo_blur={self.logo_blur:.2f} "
             f"soft_light={self.soft_light:.2f} studio={self.studio_light:.2f} "

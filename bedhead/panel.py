@@ -33,6 +33,7 @@ class Panel(tk.Tk):
         rows = (
             ("intensity", "Intensity (global)"),
             ("skin", "Skin smoothing"),
+            ("skin_texture", "Skin texture keep (pores)"),
             ("under_eye", "Under-eye brighten"),
             ("shine", "Shine control"),
             ("teeth", "Teeth whitening"),

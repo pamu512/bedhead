@@ -218,8 +218,13 @@ def _retouch_roi(
     # --- skin: frequency separation on L (chroma untouched)
     if s_skin > 0:
         # attenuate detail (blemishes live mid-frequency) but keep a floor of
-        # high-frequency texture so skin never looks plastic
-        att = 1.0 - 0.85 * skin_a
+        # high-frequency texture so skin never looks plastic; the skin_texture
+        # dial (0..1, not intensity-scaled) controls how much pore/edge energy
+        # survives: 0 = maximum matte (old behavior at att floor 0.15),
+        # 1 = keep all detail (identity). Default 0.35 sits just above the
+        # old hardcoded floor for a natural look on typical webcam light.
+        tex_keep = float(min(max(preset.skin_texture, 0.0), 1.0))
+        att = 1.0 - (1.0 - tex_keep) * skin_a
         new_l = base + detail * att
         lab[..., 0] = np.clip(new_l, 0, 255).astype(np.uint8)
         out = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
