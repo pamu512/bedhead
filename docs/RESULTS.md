@@ -63,7 +63,13 @@ same-person 0.594 vs 0.40 gate; best cross-person 0.110). Tracker lock:
 yaw (51-59 deg) or dark captures (L* 69-76). CLAHE retry did not recover
 them. Mitigation shipped: tracker gap-bridging (velocity-extrapolated hold
 with a 10-frame confidence ramp, effects fade via the ramp; re-detection
-wins instantly; tests/test_beyond_parity.py). Live cohort re-measure pending.
+wins instantly; tests/test_beyond_parity.py).
+Re-measure (2026-10-25, scripts/fairness_bridge_measure.py, 16 people /
+131 Commons photos, dark-frame flicker injection at L*~70): raw lock
+east_asian 40.0% / south_asian 34.9% / african 42.1% -> bridged 77.5% /
+90.7% / 92.1%. The inter-cohort gap closes in the dark-frame regime
+(african no longer trails); headless synthetic-flicker methodology, not a
+live-camera session.
 
 Reproduce:
 ```
