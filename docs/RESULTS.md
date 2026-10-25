@@ -32,8 +32,8 @@ reference photo admitted, LookTracker continuous adaptation):
 | color_fidelity_dE | 0.95-1.5 | < 8 | PASS |
 | exposure_gap | 0.85-7.0 | < 8 | PASS |
 | saturation_delta | 1.5-4.7 | < 10 | PASS |
-| temporal_pump | 0.02-0.03 | < 2.0 | PASS |
-| latency_ms | 31-45 (steady-state; first-run warm-up excluded) | < 45 | PASS (borderline) |
+| temporal_pump | 0.02-0.03 headless; 0.37 live full-stack (2026-10-25) | < 2.0 | PASS |
+| latency_ms | live full-stack (2026-10-25, every effect incl. blur+studio+vibrance+clothes): mean 42.4 / p95 53.1, 168 frames (scripts/live_latency_session.py). Prior face-stack sessions 31-45. | < 45 | PASS (mean) |
 | under_eye_gap | v3 live: 19-69 (raw deficit 63-82 L*) | < 10 | **v4 LIVE PASS**: 2026-10-25 session, raw 43.0 -> processed 8.0, 298/298 frames locked (scripts/live_under_eye_session.py, docs/live-under-eye-2026-10-25.json). Synthetic bench 46/64/82 deficits -> 0/0/0; real photo 85 -> 14 default / -5..1 full dial. |
 
 Reproduce: capture raw+processed frames against your reference and score

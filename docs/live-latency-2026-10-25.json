@@ -1,0 +1,8 @@
+{
+  "date": "2026-10-25",
+  "latency_ms_mean": 42.388252515224934,
+  "latency_ms_p95": 53.108112199333846,
+  "temporal_pump_l_per_frame": 0.3712574850299401,
+  "frames": 168,
+  "preset": "full stack (blur+studio+vibrance+clothes+face effects)"
+}
