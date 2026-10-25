@@ -45,7 +45,12 @@ Shipped and measured:
       native-res high-freq texture from the camera (HF = raw exactly)
 - [x] CoreML-assisted inference profiling (~64-76 ms/frame CPU+ANE
       partitioning; pure CPU 205 ms; fp16 a measured regression)
-- [ ] Real-time Tier B (< 45 ms/frame): needs a full ANE/GPU engine port
+- [x] Real-time Tier B (< 45 ms/frame): SHIPPED 2026-10-25 — inswapper
+      converted ONNX->torch->CoreML fp16 (onnx2torch two-hop; coremltools
+      8+ dropped the direct ONNX converter), GPU-placed: swap 17.9 ms,
+      TierB.process 37.4 ms mean @720p (corr 1.0000 vs ONNX, max err
+      0.004). Auto-selects coreml-gpu, falls back to onnx-cpu.
+      Regenerate: scripts/tierb_coreml_port.py
 - [ ] 256px-class model: hyperswap_1a_256 evaluated and CLOSED (46x too
       slow on CPU + embedding-space mismatch; see
       [TIERB-256-EVAL.md](TIERB-256-EVAL.md) for reopen conditions)
@@ -54,7 +59,8 @@ Shipped and measured:
       lock under dark-frame flicker, inter-cohort gap closed — see RESULTS.md);
       live session held 298/298 frames locked (2026-10-25)
 
-**Exit criteria:** 60-second continuous demo, expressions live, no waxiness, real-time.
+**Exit criteria:** 60-second continuous demo, expressions live, no waxiness,
+real-time. Real-time: MET (37.4 ms). Remaining: record the 60 s demo run.
 
 ## P2 — Alpha native app (2–3 months)
 

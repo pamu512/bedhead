@@ -61,6 +61,8 @@ def _bare_tierb(guard) -> TierB:
     tb._last_drift_sim = 1.0
     tb.last_swap_ms = 0.0
     tb._model_path = ""
+    tb._coreml = None
+    tb._emap = None
     return tb
 
 

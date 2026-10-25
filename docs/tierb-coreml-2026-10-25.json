@@ -1,0 +1,22 @@
+{
+  "date": "2026-10-25",
+  "onnx_reference_stats": {
+    "mean": 0.38509663939476013,
+    "std": 0.2593417167663574
+  },
+  "frames": 40,
+  "results": [
+    {
+      "path": "mlprogram-fp32",
+      "error": "ValueError: Unrecognized value of argument \"source\": onnx. It must be one of [\"auto\", \"tensorflow\", \"pytorch\", \"milinternal\"]."
+    },
+    {
+      "path": "mlprogram-fp16",
+      "error": "ValueError: Unrecognized value of argument \"source\": onnx. It must be one of [\"auto\", \"tensorflow\", \"pytorch\", \"milinternal\"]."
+    },
+    {
+      "path": "neuralnetwork-fp16",
+      "error": "ValueError: Unrecognized value of argument \"source\": onnx. It must be one of [\"auto\", \"tensorflow\", \"pytorch\", \"milinternal\"]."
+    }
+  ]
+}
