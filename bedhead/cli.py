@@ -411,7 +411,7 @@ def main(argv: list[str] | None = None) -> int:
                                 3, 0.6, (0, 255, 0), 2)
                 hud = (
                     f"bedhead {__version__} | {fps_ema:5.1f} fps | track+retouch {proc_ms_ema:4.1f} ms"
-                    f" | face {'LOST (passthrough)' if face is None else 'ok'}"
+                    f" | face {'LOST (passthrough)' if face is None else ('bridge ' + format(face.extras.get('bridged', 1.0), '.2f') if 'bridged' in face.extras else 'ok')}"
                     f" | {'A/B: ORIGINAL (preview only)' if preset.show_original else ''}"
                     f" | {preset.describe()}"
                 )

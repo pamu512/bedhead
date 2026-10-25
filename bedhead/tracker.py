@@ -79,6 +79,19 @@ class FaceTracker:
         # the jaw-open gate so the teeth effect never flickers at half-open.
         self._euro = OneEuro(478, freq=30.0, min_cutoff=1.2, beta=0.02)
         self._jaw_gate = Schmitt(hi=0.30, lo=0.18)
+        # detection-gap bridging (fairness): MediaPipe drops lock on dark
+        # captures and extreme yaw (fairness bench: 62% lock on the african
+        # cohort vs 87-89% elsewhere; misses correlate with L* 69-76 frames).
+        # A failed detect mid-session is usually a 1-3 frame flicker, not a
+        # real exit: hold the last good face with velocity extrapolation and
+        # a confidence ramp so effects fade out over ~10 frames instead of
+        # popping to passthrough. Re-detection always wins instantly.
+        self._bridge_max = 10           # frames to bridge after a lost detect
+        self._bridge_left = 0
+        self._last_good: np.ndarray | None = None   # (478, 3) landmarks
+        self._last_vel: np.ndarray | None = None    # (478, 3) per-frame velocity
+        self._last_extras: dict = {}
+        self._last_face_hw: tuple[int, int] | None = None
 
     def detect(self, frame_bgr: np.ndarray, timestamp_ms: int) -> FaceFrame | None:
         rgb = frame_bgr[:, :, ::-1]  # MediaPipe expects RGB
@@ -87,7 +100,7 @@ class FaceTracker:
 
         lms = getattr(result, "face_landmarks", None)
         if not lms:
-            return None
+            return self._bridge(frame_bgr)
         h, w = frame_bgr.shape[:2]
         pts = np.array([[p.x * w, p.y * h, p.z] for p in lms[0]], dtype=np.float32)
         # temporal smoothing: one-euro on x, y only (z is unused downstream)
@@ -102,7 +115,47 @@ class FaceTracker:
             extras["eye_blink_right"] = categories.get("eyeBlinkRight", 0.0)
             extras["jaw_open_gated"] = 1.0 if self._jaw_gate(
                 categories.get("jawOpen", 0.0)) else 0.0
+        self._remember_good(pts, extras, h, w)
         return FaceFrame(landmarks=pts, h=h, w=w, extras=extras)
+
+    # ------------------------------------------------------------ gap bridging
+
+    def _remember_good(self, pts: np.ndarray, extras: dict, h: int, w: int) -> None:
+        """Cache the last confident detection for gap bridging."""
+        if self._last_good is not None and self._last_face_hw == (h, w):
+            self._last_vel = pts - self._last_good
+        self._last_good = pts.copy()
+        self._last_extras = dict(extras)
+        self._last_face_hw = (h, w)
+        self._bridge_left = self._bridge_max
+
+    def _bridge(self, frame_bgr: np.ndarray) -> FaceFrame | None:
+        """Lost detection mid-session: extrapolate the last good face.
+
+        Velocity extrapolation (per landmark, decayed) keeps the overlay
+        tracking through 1-3 frame flickers; the confidence ramp fades
+        effect strength out over the bridge window so a real exit still
+        ends in honest passthrough. Returns None once the window expires
+        (cold start, or the face truly left).
+        """
+        if self._last_good is None or self._bridge_left <= 0:
+            return None
+        h, w = frame_bgr.shape[:2]
+        if self._last_face_hw != (h, w):
+            return None  # resolution changed: stale geometry, do not bridge
+        self._bridge_left -= 1
+        held = self._bridge_max - self._bridge_left        # frames since loss
+        # decay the velocity: full for frame 1, ~zero by window end
+        decay = max(0.0, 1.0 - held / self._bridge_max)
+        pts = self._last_good.copy()
+        if self._last_vel is not None:
+            pts = pts + self._last_vel * decay
+        pts[:, 0] = np.clip(pts[:, 0], 0, w - 1)
+        pts[:, 1] = np.clip(pts[:, 1], 0, h - 1)
+        conf = decay  # 1.0 -> 0.0 ramp; callers can scale effect strength
+        extras = dict(self._last_extras)
+        extras["bridged"] = conf
+        return FaceFrame(landmarks=pts, h=h, w=w, score=conf, extras=extras)
 
     def close(self) -> None:
         self._landmarker.close()

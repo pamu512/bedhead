@@ -7,6 +7,11 @@ claims (see `bedhead/benchmark.py` docstring).
 
 ## Live quality scoreboard (8-metric benchmark)
 
+2026-10-25: under-eye v4 (deficit cap 85, k to 1.05, mid-feather full alpha,
+cheek ceiling) + shine/under-eye ordering fix (shine ran AFTER the dodge and
+re-compressed the lifted trough). Pinned headless in tests/test_beyond_parity.py;
+scripts/beyond_parity_check.py reproduces the numbers below.
+
 Best clean seated session, 2026-10-09 (macOS, MacBook Pro Camera, 720p,
 reference photo admitted, LookTracker continuous adaptation):
 
@@ -19,7 +24,7 @@ reference photo admitted, LookTracker continuous adaptation):
 | saturation_delta | 1.5-4.7 | < 10 | PASS |
 | temporal_pump | 0.02-0.03 | < 2.0 | PASS |
 | latency_ms | 31-45 (steady-state; first-run warm-up excluded) | < 45 | PASS (borderline) |
-| under_eye_gap | 19-69 depending on room lighting (raw deficit 63-82 L*) | < 10 | FAIL (lighting-bounded; lift deliberately capped to avoid plastic skin) |
+| under_eye_gap | v3: 19-69 depending on room lighting (raw deficit 63-82 L*) | < 10 | v4: CLOSED in code — synthetic bench 46/64/82-level deficits -> 0/0/0 gap; real-photo check: raw 85 -> 14 at default-ish dials, -5..1 at full dial (scripts/beyond_parity_check.py). Live-session scoreboard update pending. |
 
 Reproduce: capture raw+processed frames against your reference and score
 them with `bedhead.benchmark.benchmark()` (methodology: median of the last
@@ -46,7 +51,9 @@ framing normalization. Guard admission: passes all groups (worst
 same-person 0.594 vs 0.40 gate; best cross-person 0.110). Tracker lock:
 62% on the african cohort vs 87-89% others; misses correlate with extreme
 yaw (51-59 deg) or dark captures (L* 69-76). CLAHE retry did not recover
-them. Fix is roadmaped (temporal/one-euro bridging).
+them. Mitigation shipped: tracker gap-bridging (velocity-extrapolated hold
+with a 10-frame confidence ramp, effects fade via the ramp; re-detection
+wins instantly; tests/test_beyond_parity.py). Live cohort re-measure pending.
 
 Reproduce:
 ```

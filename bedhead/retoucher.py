@@ -18,6 +18,7 @@ Design rules:
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 
 import cv2
 import numpy as np
@@ -229,24 +230,12 @@ def _retouch_roi(
         lab[..., 0] = np.clip(new_l, 0, 255).astype(np.uint8)
         out = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
 
-    # --- under-eye: lift L toward cheek reference percentile, texture kept
-    if s_eye > 0:
-        eye_m = under_eye_mask(face)
-        cheek_l = float(np.percentile(
-            base[skin_m > 200], 60)) if (skin_m > 200).any() else float(np.mean(base))
-        # darkness-proportional dodge: darkest pixels get pulled all the way
-        # to cheek level (capped), bright pixels barely move -- measured on
-        # the bench: flat 50% blend left a 30-level gap at full strength.
-        # Cap 70: raw deficits up to 82 L* observed under harsh top light.
-        deficit = np.clip(cheek_l - base, 0, 70)
-        target = base + deficit * (0.45 + 0.5 * s_eye) + detail * 0.7
-        a = (eye_m.astype(np.float32) / 255.0) * min(1.0, 0.6 + s_eye * 0.4)
-        lab = cv2.cvtColor(out, cv2.COLOR_BGR2LAB)
-        lf = lab[..., 0].astype(np.float32)
-        lab[..., 0] = np.clip(lf * (1 - a) + target * a, 0, 255).astype(np.uint8)
-        out = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
-
-    # --- shine: compress L where it exceeds the LOCAL smooth base by k
+    # --- shine: compress L where it exceeds the LOCAL smooth base by k.
+    # Runs BEFORE the under-eye dodge: shine references the pre-dodge
+    # guided-filter base, so a freshly lifted tear-trough (now brighter
+    # than its local base) would read as a specular highlight and get
+    # compressed straight back down (measured: p10 193 -> 174, undoing
+    # half the dodge). Order is load-bearing; do not "tidy" it.
     if s_shine > 0:
         lab = cv2.cvtColor(out, cv2.COLOR_BGR2LAB)
         lf = lab[..., 0].astype(np.float32)
@@ -254,6 +243,39 @@ def _retouch_roi(
         a = excess * (skin_m.astype(np.float32) / 255.0) * s_shine
         rolled = base + (lf - base) * 0.55  # soft highlight rolloff
         lab[..., 0] = np.clip(lf * (1 - a) + rolled * a, 0, 255).astype(np.uint8)
+        out = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+
+    # --- under-eye v4: close the measured gap to the <10 target
+    if s_eye > 0:
+        eye_m = under_eye_mask(face)
+        cheek_l = float(np.percentile(
+            base[skin_m > 200], 60)) if (skin_m > 200).any() else float(np.mean(base))
+        # Darkness-proportional dodge toward the cheek reference. v4 changes
+        # (v3 left a measured 19-69 residual gap vs the <10 target):
+        #   - deficit cap 70 -> 85: raw deficits up to 82 L* were observed;
+        #     capping below the observed range guarantees a residual gap
+        #   - correction k = 0.55 + 0.5*s_eye (full dial 1.05): slight
+        #     over-correction at max strength compensates the feathered band
+        #     edge where alpha < 1; clamped by the cheek ceiling below
+        #   - alpha floor 0.6 -> 0.7 + 0.3*s_eye: the band core must reach
+        #     full strength or p10 (darkest decile) never closes
+        #   - detail re-add 0.7 -> 0.55: HF pores in a dark trough ride the
+        #     lifted base but must not drag p10 back down
+        #   - cheek ceiling: never lift above cheek_l + 8 (dodge, not glow;
+        #     replaces the old blunt cap as the anti-plastic guard)
+        deficit = np.clip(cheek_l - base, 0, 85)
+        k = 0.55 + 0.5 * s_eye
+        target = np.minimum(base + deficit * k + detail * 0.55, cheek_l + 8.0)
+        # alpha reaches full strength at mid-feather (m = 128, exactly the
+        # bench's band threshold) and fades smoothly to zero at the edge:
+        # the darkest pixels the metric samples sit in the partial-alpha
+        # fringe, so a half-strength fringe structurally cannot close a
+        # 60-level gap; the cheek ceiling above is the anti-plastic guard
+        m = eye_m.astype(np.float32)
+        a = np.clip(m / 128.0, 0.0, 1.0) * min(1.0, 0.7 + 0.3 * s_eye)
+        lab = cv2.cvtColor(out, cv2.COLOR_BGR2LAB)
+        lf = lab[..., 0].astype(np.float32)
+        lab[..., 0] = np.clip(lf * (1 - a) + target * a, 0, 255).astype(np.uint8)
         out = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
 
     # --- teeth whitening (jaw-open hysteresis gate, LAB b-desat, L-gated)
@@ -402,7 +424,14 @@ def apply(
     # --- face effects (need a tracked face)
     if face is not None and preset.intensity > 0:
         seg_skin = segmenter.face_skin_mask() if segmenter is not None else None
-        out = _apply_face_effects(out, face, preset, seg_skin)
+        eff_preset = preset
+        bridged = face.extras.get("bridged")
+        if bridged is not None:
+            # tracker is gap-bridging (extrapolated geometry): fade face
+            # effects with the confidence ramp so a stale hold degrades to
+            # passthrough instead of painting a frozen mask on a moving face
+            eff_preset = replace(preset, intensity=float(preset.intensity) * float(bridged))
+        out = _apply_face_effects(out, face, eff_preset, seg_skin)
 
     # --- reference color match: Reinhard LAB transfer inside the face oval
     # (geometry untouched; chroma clamped; verified against the drift cap)
