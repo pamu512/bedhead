@@ -34,7 +34,7 @@ reference photo admitted, LookTracker continuous adaptation):
 | saturation_delta | 1.5-4.7 | < 10 | PASS |
 | temporal_pump | 0.02-0.03 | < 2.0 | PASS |
 | latency_ms | 31-45 (steady-state; first-run warm-up excluded) | < 45 | PASS (borderline) |
-| under_eye_gap | v3: 19-69 depending on room lighting (raw deficit 63-82 L*) | < 10 | v4: CLOSED in code — synthetic bench 46/64/82-level deficits -> 0/0/0 gap; real-photo check: raw 85 -> 14 at default-ish dials, -5..1 at full dial (scripts/beyond_parity_check.py). Live-session scoreboard update pending. |
+| under_eye_gap | v3 live: 19-69 (raw deficit 63-82 L*) | < 10 | **v4 LIVE PASS**: 2026-10-25 session, raw 43.0 -> processed 8.0, 298/298 frames locked (scripts/live_under_eye_session.py, docs/live-under-eye-2026-10-25.json). Synthetic bench 46/64/82 deficits -> 0/0/0; real photo 85 -> 14 default / -5..1 full dial. |
 
 Reproduce: capture raw+processed frames against your reference and score
 them with `bedhead.benchmark.benchmark()` (methodology: median of the last
@@ -69,7 +69,9 @@ Re-measure (2026-10-25, scripts/fairness_bridge_measure.py, 16 people /
 east_asian 40.0% / south_asian 34.9% / african 42.1% -> bridged 77.5% /
 90.7% / 92.1%. The inter-cohort gap closes in the dark-frame regime
 (african no longer trails); headless synthetic-flicker methodology, not a
-live-camera session.
+live-camera session. 2026-10-25 live note: a 298-frame live session held
+face lock continuously (0 lost frames) under office lighting — see
+docs/live-under-eye-2026-10-25.json.
 
 Reproduce:
 ```

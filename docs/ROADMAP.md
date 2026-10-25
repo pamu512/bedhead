@@ -52,7 +52,7 @@ Shipped and measured:
 - [ ] Fairness: tracker-lock recovery at extreme yaw — gap-bridging shipped
       (10-frame confidence ramp; headless re-measure: 42.1% -> 92.1% african
       lock under dark-frame flicker, inter-cohort gap closed — see RESULTS.md);
-      live-camera confirmation still pending
+      live session held 298/298 frames locked (2026-10-25)
 
 **Exit criteria:** 60-second continuous demo, expressions live, no waxiness, real-time.
 

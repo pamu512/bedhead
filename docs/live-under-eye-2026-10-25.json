@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-25",
+  "raw_median_last5": 43.0,
+  "processed_median_last5": 8.0,
+  "n_metric_frames": 298,
+  "frames": 298,
+  "preset": {
+    "intensity": 0.85,
+    "under_eye": 0.8,
+    "skin": 0.6,
+    "shine": 0.5
+  }
+}
