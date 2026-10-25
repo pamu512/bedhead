@@ -49,9 +49,10 @@ Shipped and measured:
 - [ ] 256px-class model: hyperswap_1a_256 evaluated and CLOSED (46x too
       slow on CPU + embedding-space mismatch; see
       [TIERB-256-EVAL.md](TIERB-256-EVAL.md) for reopen conditions)
-- [ ] Fairness: tracker-lock recovery at extreme yaw — first step shipped
-      (gap-bridging: velocity-extrapolated hold, 10-frame confidence ramp,
-      tests/test_beyond_parity.py); live cohort re-measure still pending
+- [ ] Fairness: tracker-lock recovery at extreme yaw — gap-bridging shipped
+      (10-frame confidence ramp; headless re-measure: 42.1% -> 92.1% african
+      lock under dark-frame flicker, inter-cohort gap closed — see RESULTS.md);
+      live-camera confirmation still pending
 
 **Exit criteria:** 60-second continuous demo, expressions live, no waxiness, real-time.
 
