@@ -31,6 +31,11 @@ CLOTHES_CATEGORY = 4
 
 _FEATHER_K = 31
 
+# crease-delta cache: {(mask object id) -> (mask ref, (rh, rw), delta)}.
+# Single entry: consecutive tidy() calls share one garment; a new mask
+# object (segmentation refresh) invalidates it naturally.
+_crease_cache: dict = {}
+
 # Logo/text print detection thresholds (on the half-res deviation map):
 # a print is a COMPACT blob whose color deviates hard from the garment median.
 _LOGO_DEV_T = 55.0        # min worst-channel deviation to count as "print"
@@ -145,7 +150,15 @@ def tidy(
     mask: np.ndarray | None,
     preset: Preset,
 ) -> np.ndarray:
-    """Steam-iron effect. `mask` is the feathered garment mask (full frame)."""
+    """Steam-iron effect. `mask` is the feathered garment mask (full frame).
+
+    The crease-smoothing delta field is cached per mask object: the caller
+    (ClothesSegmenter.clothes_mask_cached) hands us the SAME mask between
+    segmentation refreshes, so the edge-preserving pass (the expensive part)
+    reruns only when segmentation actually refreshed -- the same staleness
+    cadence the mask itself already has. Content frames in between reuse
+    the delta, exactly as they reuse the mask.
+    """
     if mask is None:
         return frame_bgr
     s_clothes = preset.scaled("clothes")
@@ -163,14 +176,20 @@ def tidy(
     out = roi.copy()
     rh, rw = roi.shape[:2]
 
-    # --- crease softening (edge-preserving at half res, applied as a delta layer)
+    # --- crease softening (edge-preserving at half res, applied as a delta layer;
+    # delta cached per mask object -- see docstring)
     if s_clothes > 0 and rw >= 4 and rh >= 4:
         hw2, hh2 = rw // 2, rh // 2
-        small = cv2.resize(roi, (hw2, hh2), interpolation=cv2.INTER_LINEAR)
-        smooth_small = cv2.edgePreservingFilter(small, flags=1, sigma_s=60, sigma_r=0.45)
-        a_small = cv2.resize(mroi, (hw2, hh2), interpolation=cv2.INTER_LINEAR).astype(np.float32) / 255.0
-        delta_small = (smooth_small.astype(np.float32) - small.astype(np.float32)) * a_small[..., None] * s_clothes
-        delta = cv2.resize(delta_small, (rw, rh), interpolation=cv2.INTER_LINEAR)
+        cached = _crease_cache.get("entry")
+        if cached is not None and cached[0] is mask and cached[1] == (rh, rw):
+            delta = cached[2]
+        else:
+            small = cv2.resize(roi, (hw2, hh2), interpolation=cv2.INTER_LINEAR)
+            smooth_small = cv2.edgePreservingFilter(small, flags=1, sigma_s=60, sigma_r=0.45)
+            a_small = cv2.resize(mroi, (hw2, hh2), interpolation=cv2.INTER_LINEAR).astype(np.float32) / 255.0
+            delta_small = (smooth_small.astype(np.float32) - small.astype(np.float32)) * a_small[..., None] * s_clothes
+            delta = cv2.resize(delta_small, (rw, rh), interpolation=cv2.INTER_LINEAR)
+            _crease_cache["entry"] = (mask, (rh, rw), delta)
         out = np.clip(out.astype(np.float32) + delta, 0, 255).astype(np.uint8)
 
     # --- shared half-res deviation map (stain fade + logo/text blur)
