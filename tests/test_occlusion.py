@@ -41,6 +41,18 @@ def _frame() -> np.ndarray:
     return cv2.resize(img, (W, H))
 
 
+# Module-level availability check: tests construct MediaPipe sessions
+# (FaceTracker/Segmenter) BEFORE _frame() runs, and an unclosed landmarker
+# whose test skipped DEADLOCKS MediaPipe's dispatcher during pytest's GC
+# teardown (measured: suite exit hangs forever; the isolated test skips
+# fine). When the fixture is missing, skip at collection instead.
+_FRAME_AVAILABLE = cv2.imread(PORTRAIT) is not None
+
+pytestmark = pytest.mark.skipif(
+    not _FRAME_AVAILABLE, reason="portrait fixture not available"
+)
+
+
 def _hand_over_cheek(frame: np.ndarray, face) -> np.ndarray:
     """Realistic thinking-pose hand: separated fingers, nails, knuckle shading."""
     out = frame.copy()
