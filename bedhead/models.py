@@ -42,19 +42,24 @@ MODELS: dict[str, tuple[str, str]] = {
     "selfie_multiclass_256x256.tflite": (_SEGMENTER_URL, _SEGMENTER_SHA256),
 }
 
-# selfie-multiclass label space (verified empirically against the model on a
-# real-face photo: class-3 centroid lands mid-face, class-2 lands at the
-# shoulders/chest, class-4 on the crown).
+# selfie-multiclass label space. Two sources agree — the model card's
+# labels.txt AND a spatial-centroid probe on a real portrait (2026-10-25):
+# class-1 centroid lands on the crown (y=0.14 of frame height) = hair,
+# class-2 at the shoulders (y=0.82) = body-skin (hands/arms/neck),
+# class-4 covers the torso (24.6% of frame) = clothes. An earlier comment
+# swapped 1 and 4; do not "fix" this back without re-probing.
 SELFIE_CLASSES = {
     0: "background",
-    1: "body-skin",
-    2: "clothes",
+    1: "hair",
+    2: "body-skin",
     3: "face-skin",
-    4: "hair",
+    4: "clothes",
     5: "others",
 }
 FACE_SKIN_CLASS = 3
-HAIR_CLASS = 4
+HAIR_CLASS = 1
+BODY_SKIN_CLASS = 2
+OTHERS_CLASS = 5
 BACKGROUND_CLASS = 0
 
 

@@ -18,9 +18,9 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from bedhead.config import Preset  # noqa: E402
-from bedhead.retoucher import _retouch_roi, apply, under_eye_mask  # noqa: E402
-from bedhead.tracker import FACE_OVAL, FaceTracker  # noqa: E402
+from bedhead.config import Preset
+from bedhead.retoucher import _retouch_roi, apply, under_eye_mask
+from bedhead.tracker import FACE_OVAL, FaceTracker
 
 
 def _gap(lab_l: np.ndarray, band: np.ndarray, oval: np.ndarray) -> float:

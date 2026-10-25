@@ -133,7 +133,7 @@ class TierB:
         latent = reference_face.normed_embedding.reshape(1, -1) @ self._emap
         latent = (latent / np.linalg.norm(latent)).astype(np.float32)
         pred = self._coreml.predict({"target": blob.astype(np.float32), "source": latent})
-        p = np.asarray(list(pred.values())[0]).astype(np.float32)
+        p = np.asarray(next(iter(pred.values()))).astype(np.float32)
         if p.shape != (1, 3, 128, 128):
             p = p.reshape(1, 3, 128, 128)
         bgr_fake = np.clip(p[0].transpose(1, 2, 0) * 255.0, 0, 255).astype(np.uint8)[:, :, ::-1]

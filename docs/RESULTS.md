@@ -79,9 +79,16 @@ python scripts/fetch_fairness_fixtures.py   # populates /tmp/bh_fairness (Common
 pytest tests/test_fairness.py               # skips without the fixtures
 ```
 
-## Tier B spike (IN Swapper 128)
+## Tier B (IN Swapper 128)
 
-- CoreML-assisted (CPU+ANE partitioning): ~64-76 ms/frame warm
+- CoreML GPU engine (2026-10-25 port, scripts/tierb_coreml_port.py):
+  swap predict 16.8-17.9 ms, full guarded TierB.process 37.4 ms mean /
+  47.9 p95 at 720p; corr 1.0000 vs the ONNX CPU reference (max err 0.003
+  on [0,1]). Conversion: onnx -> torch (onnx2torch) -> trace -> CoreML
+  fp16 mlprogram (coremltools >= 8 dropped the direct ONNX converter).
+  docs/tierb-coreml-2026-10-25.json carries the per-candidate runs.
+  UX: --tier-b starts at blend 0; `g` steps 0.25/press.
+- Legacy ONNX CPU path (pre-port): ~64-76 ms/frame warm
 - Pure CPU: 205 ms; fp16 conversion: measured regression (not used)
 - Own-face drift similarity 0.947 (cap 0.35); foreign reference rejected
   at admission with similarity 0.103

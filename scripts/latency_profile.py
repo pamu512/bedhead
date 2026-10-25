@@ -21,11 +21,11 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from bedhead.clothes import ClothesSegmenter, tidy  # noqa: E402
-from bedhead.config import Preset  # noqa: E402
-from bedhead.retoucher import apply  # noqa: E402
-from bedhead.segmenter import Segmenter  # noqa: E402
-from bedhead.tracker import FaceTracker  # noqa: E402
+from bedhead.clothes import ClothesSegmenter, tidy
+from bedhead.config import Preset
+from bedhead.retoucher import apply
+from bedhead.segmenter import Segmenter
+from bedhead.tracker import FaceTracker
 
 N = 30  # measured frames (warm-up excluded)
 
@@ -84,8 +84,7 @@ def main(photo: str | None) -> None:
     budget = 33.3
     for name, vals in stages.items():
         arr = np.array(vals)
-        mark = "" if name == "total" else ""
-        print(f"  {name:9s}: mean {arr.mean():5.1f} ms | p95 {np.percentile(arr, 95):5.1f} ms{mark}")
+        print(f"  {name:9s}: mean {arr.mean():5.1f} ms | p95 {np.percentile(arr, 95):5.1f} ms")
     t = np.array(stages["total"])
     fps = 1000.0 / t.mean()
     print(f"  -> end-to-end mean {t.mean():.1f} ms = {fps:.0f} fps ceiling "

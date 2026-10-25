@@ -22,11 +22,11 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from bedhead.clothes import ClothesSegmenter, tidy  # noqa: E402
-from bedhead.config import Preset  # noqa: E402
-from bedhead.retoucher import apply  # noqa: E402
-from bedhead.segmenter import Segmenter  # noqa: E402
-from bedhead.tracker import FACE_OVAL, FaceTracker  # noqa: E402
+from bedhead.clothes import ClothesSegmenter, tidy
+from bedhead.config import Preset
+from bedhead.retoucher import apply
+from bedhead.segmenter import Segmenter
+from bedhead.tracker import FACE_OVAL, FaceTracker
 
 W, H = 1280, 720
 

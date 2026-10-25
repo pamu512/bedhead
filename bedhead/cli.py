@@ -259,6 +259,11 @@ def main(argv: list[str] | None = None) -> int:
             (p.background_strength > 0 and p.background_mode != "off")
             or p.studio_light > 0
             or p.background_darken > 0  # subject pop needs the person mask
+            # occlusion hardening: active face retouch needs the occluder
+            # matte, else a hand on the cheek is retouched through (the
+            # landmark oval cannot know about hands)
+            or (p.intensity > 0 and (p.skin > 0 or p.under_eye > 0 or p.shine > 0
+                                     or p.detail_boost > 0))
         )
 
     def _get_segmenter() -> Segmenter | None:

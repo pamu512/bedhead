@@ -30,7 +30,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from bedhead.tracker import FaceTracker  # noqa: E402
+from bedhead.tracker import FaceTracker
 
 ROOT = Path("/tmp/bh_fairness")
 W, H = 1280, 720
@@ -109,14 +109,14 @@ def run_sequence(tracker: FaceTracker, frames: list[np.ndarray]) -> tuple[int, i
 
 def main() -> None:
     seqs = build_sequences()
-    print(f"people: " + ", ".join(f"{g}={len(seqs.get(g, {}))}" for g in GROUPS))
+    print("people: " + ", ".join(f"{g}={len(seqs.get(g, {}))}" for g in GROUPS))
     total_raw = total_brd = total_n = 0
     for group in GROUPS:
         people = seqs.get(group, {})
         if not people:
             continue
         raw_l = brd_l = n = 0
-        for person, frames in people.items():
+        for frames in people.values():
             if len(frames) < 2:
                 continue
             # sequence: orig, dark(orig), orig, dark(orig), ... (flicker sim)
@@ -125,12 +125,12 @@ def main() -> None:
                 seq.append(fr)
                 seq.append(darken_to_l(fr, 70.0))
             t_raw = FaceTracker()
-            t_raw._bridge_max = 0            # noqa: SLF001 - measurement switch
+            t_raw._bridge_max = 0
             t_raw._bridge_left = 0
             l0, n0 = run_sequence(t_raw, seq)
             t_raw.close()
             t_brd = FaceTracker()
-            l1, n1 = run_sequence(t_brd, seq)
+            l1, _ = run_sequence(t_brd, seq)
             t_brd.close()
             raw_l += l0; brd_l += l1; n += n0
         if n:

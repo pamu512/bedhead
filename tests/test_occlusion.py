@@ -26,8 +26,8 @@ from bedhead.config import Preset
 
 pytest.importorskip("mediapipe")
 
-from bedhead.segmenter import Segmenter  # noqa: E402
-from bedhead.tracker import FaceTracker  # noqa: E402
+from bedhead.segmenter import Segmenter
+from bedhead.tracker import FaceTracker
 
 W, H = 1280, 720
 PORTRAIT = (__file__.rsplit("/", 2)[0]

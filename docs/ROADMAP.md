@@ -45,12 +45,14 @@ Shipped and measured:
       native-res high-freq texture from the camera (HF = raw exactly)
 - [x] CoreML-assisted inference profiling (~64-76 ms/frame CPU+ANE
       partitioning; pure CPU 205 ms; fp16 a measured regression)
-- [x] Real-time Tier B (< 45 ms/frame): SHIPPED 2026-10-25 — inswapper
+- [x] Real-time Tier B (< 45 ms mean/frame): SHIPPED 2026-10-25 — inswapper
       converted ONNX->torch->CoreML fp16 (onnx2torch two-hop; coremltools
-      8+ dropped the direct ONNX converter), GPU-placed: swap 17.9 ms,
-      TierB.process 37.4 ms mean @720p (corr 1.0000 vs ONNX, max err
-      0.004). Auto-selects coreml-gpu, falls back to onnx-cpu.
-      Regenerate: scripts/tierb_coreml_port.py
+      8+ dropped the direct ONNX converter), GPU-placed: swap 16.8 ms,
+      TierB.process 37.4 ms mean / 47.9 p95 @720p (corr 1.0000 vs ONNX,
+      max err 0.003; docs/tierb-coreml-2026-10-25.json). Auto-selects
+      coreml-gpu, falls back to onnx-cpu. mlpackage is gitignored —
+      regenerate with scripts/tierb_coreml_port.py. p95 (47.9) exceeds
+      the 45 ms line: mean passes, tail latency is open follow-up work.
 - [ ] 256px-class model: hyperswap_1a_256 evaluated and CLOSED (46x too
       slow on CPU + embedding-space mismatch; see
       [TIERB-256-EVAL.md](TIERB-256-EVAL.md) for reopen conditions)

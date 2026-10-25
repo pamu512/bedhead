@@ -21,8 +21,12 @@ H, W = 240, 208
 
 def _face() -> FaceFrame:
     from bedhead.tracker import (
-        INNER_LIPS, LEFT_BROW, LEFT_EYE_RING,
-        OUTER_LIPS, RIGHT_BROW, RIGHT_EYE_RING,
+        INNER_LIPS,
+        LEFT_BROW,
+        LEFT_EYE_RING,
+        OUTER_LIPS,
+        RIGHT_BROW,
+        RIGHT_EYE_RING,
     )
 
     cx, cy = W / 2, H / 2

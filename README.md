@@ -8,7 +8,7 @@
 
 ## Status
 
-P0.5 (Python). Tier A retouch rebuilt on a research-grade quality engine, plus the parity features (background modes, person relight, eye light) and a guarded Tier B generative spike (not real-time; see below); see [`docs/ROADMAP.md`](docs/ROADMAP.md).
+P0.5 (Python). Tier A retouch rebuilt on a research-grade quality engine, plus the parity features (background modes, person relight, eye light) and a guarded Tier B generative re-render (real-time on the CoreML GPU engine; see below); see [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 - ✅ MediaPipe 478-point face tracking (VIDEO mode, ~5 ms/frame standalone measurement; ~31-45 ms full pipeline on the live bench), one-euro smoothed
 - ✅ Quality-engine retouch: guided-filter frequency separation, LAB pipeline, guided-filter-base shine compression, hysteresis teeth gate, selective sharpening (~9 ms/frame for the face-ROI effects at 720p on Apple Silicon)
@@ -31,13 +31,16 @@ P0.5 (Python). Tier A retouch rebuilt on a research-grade quality engine, plus t
 - ✅ Installers: macOS `.pkg` (pkgbuild, notarize-ready) + Windows Inno Setup
   `.exe` (per-user, PATH, uninstaller); both CI-built and smoke-tested
 - ⏳ Tier B generative re-render (LivePortrait-class; research says Core ML/ANE only, not CPU)
-- 🧪 Tier B spike SHIPPED (guarded): `bedhead --reference you.jpg --tier-b` runs IN Swapper
+- 🧪 Tier B SHIPPED (guarded, real-time): `bedhead --reference you.jpg --tier-b` runs IN Swapper
   under the full guard contract (admitted-reference-only, drift-capped every 10 frames,
   progressive fail-safe — blend halves before disable, fail-safe to Tier A, `g` blend dial).
   Frequency-separable composite keeps the aligned crop's high-frequency band (measured cheek HF equal to the crop's; the crop is 128px, so pore-level detail beyond that resolution is not invented).
-  CoreML-assisted ~64-76 ms/frame on
-  Apple Silicon (CPU-only 205 ms; fp16 a measured regression); real-time
-  needs a full ANE/GPU engine port (P1). 256px hyperswap evaluated and
+  REAL-TIME on the CoreML GPU engine (2026-10-25 port: swap ~17 ms, full
+  guarded chain 37.4 ms mean / 47.9 p95 at 720p, corr 1.0000 vs ONNX;
+  regenerate the mlpackage with scripts/tierb_coreml_port.py).
+  Falls back to ONNX CPU (~64-76 ms CoreML-assisted / 205 ms pure) when the
+  mlpackage is absent. NOTE: `--tier-b` starts at blend 0 — press `g` to
+  step the Tier B blend up (0.25 steps). 256px hyperswap evaluated and
   closed (see [docs/TIERB-256-EVAL.md](docs/TIERB-256-EVAL.md)).
 - ⏳ Native macOS app + CMIO camera extension
 

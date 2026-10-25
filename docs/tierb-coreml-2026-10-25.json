@@ -1,22 +1,43 @@
 {
   "date": "2026-10-25",
+  "conversion": "onnx -> torch (onnx2torch) -> jit.trace -> coremltools mlprogram",
   "onnx_reference_stats": {
-    "mean": 0.38509663939476013,
-    "std": 0.2593417167663574
+    "mean": 0.3851071298122406,
+    "std": 0.25934508442878723
   },
-  "frames": 40,
+  "frames": 30,
   "results": [
     {
-      "path": "mlprogram-fp32",
-      "error": "ValueError: Unrecognized value of argument \"source\": onnx. It must be one of [\"auto\", \"tensorflow\", \"pytorch\", \"milinternal\"]."
+      "path": "inswapper_128_coreml_mlprogram_fp32.mlpackage",
+      "compute_units": "ALL",
+      "latency_ms_mean": 42.654636033209194,
+      "latency_ms_p95": 45.86864200064156,
+      "max_abs_err_vs_onnx": 1.0132789611816406e-05,
+      "corr_vs_onnx": 0.9999999999869167
     },
     {
-      "path": "mlprogram-fp16",
-      "error": "ValueError: Unrecognized value of argument \"source\": onnx. It must be one of [\"auto\", \"tensorflow\", \"pytorch\", \"milinternal\"]."
+      "path": "inswapper_128_coreml_mlprogram_fp32.mlpackage",
+      "compute_units": "CPU_ONLY",
+      "latency_ms_mean": 276.563193033265,
+      "latency_ms_p95": 299.28512690275966,
+      "max_abs_err_vs_onnx": 1.3589859008789062e-05,
+      "corr_vs_onnx": 0.999999999980794
     },
     {
-      "path": "neuralnetwork-fp16",
-      "error": "ValueError: Unrecognized value of argument \"source\": onnx. It must be one of [\"auto\", \"tensorflow\", \"pytorch\", \"milinternal\"]."
+      "path": "inswapper_128_coreml_mlprogram_fp16.mlpackage",
+      "compute_units": "ALL",
+      "latency_ms_mean": 16.796945834115224,
+      "latency_ms_p95": 17.15715175596415,
+      "max_abs_err_vs_onnx": 0.003227531909942627,
+      "corr_vs_onnx": 0.9999992548261396
+    },
+    {
+      "path": "inswapper_128_coreml_mlprogram_fp16.mlpackage",
+      "compute_units": "CPU_ONLY",
+      "latency_ms_mean": 105.65076393346924,
+      "latency_ms_p95": 112.07263779688219,
+      "max_abs_err_vs_onnx": 0.09213092923164368,
+      "corr_vs_onnx": 0.9995489934705675
     }
   ]
 }

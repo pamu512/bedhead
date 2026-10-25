@@ -18,7 +18,14 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
-from .models import BACKGROUND_CLASS, FACE_SKIN_CLASS, HAIR_CLASS, ensure_models
+from .models import (
+    BACKGROUND_CLASS,
+    BODY_SKIN_CLASS,
+    FACE_SKIN_CLASS,
+    HAIR_CLASS,
+    OTHERS_CLASS,
+    ensure_models,
+)
 
 SEG_INTERVAL = 3          # run the segmenter every Nth processed frame
 SEG_INPUT_W, SEG_INPUT_H = 480, 270   # native-ish; cost is scale-invariant
@@ -71,14 +78,15 @@ class Segmenter:
         person_s = (cat != BACKGROUND_CLASS).astype(np.float32)
         face_s = (cat == FACE_SKIN_CLASS).astype(np.float32)
         hair_s = (cat == HAIR_CLASS).astype(np.float32)
-        # occluder classes: hands (body-skin) and misc foreground (glasses,
-        # phone, hair tools, "others"). Subtracted from the face-skin matte
-        # in face_skin_mask() so retouch never paints over a hand on the
-        # cheek/face. Measured on a synthetic hand-on-cheek: the zone reads
-        # 55% face-skin / 41% others / 2% body-skin -- the "others" core is
-        # the occluder, and without this subtraction it would be retouched.
-        occl_s = np.maximum((cat == 1).astype(np.float32),   # body-skin
-                            (cat == 5).astype(np.float32))  # others
+        # occluder classes: body-skin (hands, arms) and misc foreground
+        # (glasses, phone, hair tools, "others"). Subtracted from the
+        # face-skin matte in face_skin_mask() so retouch never paints over
+        # a hand on the cheek/face. Measured on a synthetic hand-on-cheek:
+        # the zone reads 55% face-skin / 41% others / 2% body-skin; class
+        # mapping verified by centroid probe (models.py note) — the earlier
+        # 1=body-skin/4=hair swap left real hands (class 2) ungated.
+        occl_s = np.maximum((cat == BODY_SKIN_CLASS).astype(np.float32),
+                            (cat == OTHERS_CLASS).astype(np.float32))
         # dilate at segmentation scale: finger/palm EDGES route to face-skin
         # (skin-toned), and without dilation a 1-2px face-skin rim survives
         # around every occluder and gets retouched

@@ -14,10 +14,9 @@ from __future__ import annotations
 
 import cv2
 import numpy as np
-import pytest
 
 from bedhead.config import Preset
-from bedhead.retoucher import _retouch_roi, apply, skin_mask, under_eye_mask
+from bedhead.retoucher import _retouch_roi, apply, under_eye_mask
 from bedhead.tracker import FACE_OVAL, FaceFrame
 
 H, W = 480, 416
@@ -26,8 +25,12 @@ H, W = 480, 416
 def _face() -> FaceFrame:
     """Realistic-proportioned face: ~67px eyes so the band has a solid core."""
     from bedhead.tracker import (
-        INNER_LIPS, LEFT_BROW, LEFT_EYE_RING,
-        OUTER_LIPS, RIGHT_BROW, RIGHT_EYE_RING,
+        INNER_LIPS,
+        LEFT_BROW,
+        LEFT_EYE_RING,
+        OUTER_LIPS,
+        RIGHT_BROW,
+        RIGHT_EYE_RING,
     )
 
     cx, cy = W / 2, H / 2
@@ -55,7 +58,6 @@ def _dark_trough_roi(deficit: float = 55.0) -> np.ndarray:
     roi = np.full((H, W, 3), (150, 180, 205), np.uint8)
     # map deficit L* onto a BGR darkening (approx: -1 L* ~ -1.2 per chan)
     dark = np.clip(np.array([150.0, 180.0, 205.0]) - deficit * 1.2, 0, 255)
-    face = _face()
     for ring in range(2):
         ex = -0.16 if ring == 0 else 0.16
         cx = int(W / 2 + ex * W)
@@ -180,8 +182,6 @@ class TestTrackerBridging:
 
         frame = sff(H, W)
         face = _face_with_extras({"bridged": 0.3})
-        out_full = apply(frame, face, Preset(intensity=1.0, skin=0.9))
-        face_full = _face_with_extras({})
         out_bridged = apply(frame, face, Preset(intensity=1.0, skin=0.9))
         # the bridged run must differ from a full-strength run on a NO-face
         # frame (passthrough) - i.e. effects fade with confidence
