@@ -51,6 +51,7 @@ class Segmenter:
         self.person: np.ndarray | None = None      # 1 = person
         self.face_skin: np.ndarray | None = None   # 1 = face skin
         self.hair: np.ndarray | None = None        # 1 = hair
+        self.occluder: np.ndarray | None = None    # 1 = body-skin/others (hands etc.)
         self._ts = -1
         self._frames_seen = 0
 
@@ -70,9 +71,22 @@ class Segmenter:
         person_s = (cat != BACKGROUND_CLASS).astype(np.float32)
         face_s = (cat == FACE_SKIN_CLASS).astype(np.float32)
         hair_s = (cat == HAIR_CLASS).astype(np.float32)
+        # occluder classes: hands (body-skin) and misc foreground (glasses,
+        # phone, hair tools, "others"). Subtracted from the face-skin matte
+        # in face_skin_mask() so retouch never paints over a hand on the
+        # cheek/face. Measured on a synthetic hand-on-cheek: the zone reads
+        # 55% face-skin / 41% others / 2% body-skin -- the "others" core is
+        # the occluder, and without this subtraction it would be retouched.
+        occl_s = np.maximum((cat == 1).astype(np.float32),   # body-skin
+                            (cat == 5).astype(np.float32))  # others
+        # dilate at segmentation scale: finger/palm EDGES route to face-skin
+        # (skin-toned), and without dilation a 1-2px face-skin rim survives
+        # around every occluder and gets retouched
+        k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+        occl_s = cv2.dilate(occl_s, k)
 
         for name, small_mask in (("person", person_s), ("face_skin", face_s),
-                                 ("hair", hair_s)):
+                                 ("hair", hair_s), ("occluder", occl_s)):
             up = cv2.resize(small_mask, (w, h), interpolation=cv2.INTER_LINEAR)
             cur = getattr(self, name)
             if (
@@ -130,10 +144,27 @@ class Segmenter:
         return base
 
     def face_skin_mask(self, feather: int = FEATHER_K) -> np.ndarray:
+        """Face-skin matte with occluders subtracted (hands, glasses, props).
+
+        gate = face_skin * (1 - occluder): pixels the segmenter routes to
+        body-skin or "others" are removed from the retouch gate even when
+        they sit inside the landmark oval, so a hand on the cheek is passed
+        through to the camera untouched instead of being smoothed over.
+        """
         if self.face_skin is None:
             return np.zeros((self._h, self._w), np.float32)
+        m = self.face_skin
+        if self.occluder is not None:
+            m = m * (1.0 - self.occluder)
         k = feather | 1
-        return cv2.GaussianBlur(self.face_skin, (k, k), 0)
+        return cv2.GaussianBlur(m, (k, k), 0)
+
+    def occluder_mask(self, feather: int = FEATHER_K) -> np.ndarray:
+        """Occluder matte [0,1]: body-skin/others (hands, glasses, props)."""
+        if self.occluder is None:
+            return np.zeros((self._h, self._w), np.float32)
+        k = feather | 1
+        return cv2.GaussianBlur(self.occluder, (k, k), 0)
 
     def hair_mask(self, feather: int = FEATHER_K) -> np.ndarray:
         if self.hair is None:

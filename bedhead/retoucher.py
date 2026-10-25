@@ -173,6 +173,7 @@ def _retouch_roi(
     face: FaceFrame,
     preset: Preset,
     seg_skin: np.ndarray | None = None,
+    occl_roi: np.ndarray | None = None,
 ) -> np.ndarray:
     """All face effects, computed inside the ROI only.
 
@@ -204,11 +205,18 @@ def _retouch_roi(
     skin_m = skin_mask(face)
     # true-skin refinement from the segmenter (intersects with the oval mask:
     # segmentation knows about hair strands/glasses, the oval keeps geometry)
+    occl_f = np.zeros((roi.shape[0], roi.shape[1]), np.float32)
     if seg_skin is not None and seg_skin.any():
         seg_u8 = (np.clip(seg_skin, 0, 1) * 255).astype(np.uint8)
         if seg_u8.shape != skin_m.shape:
             seg_u8 = cv2.resize(seg_u8, (skin_m.shape[1], skin_m.shape[0]))
         skin_m = cv2.min(skin_m, seg_u8)
+    if occl_roi is not None and occl_roi.size:
+        o = occl_roi.astype(np.float32)
+        if o.shape != occl_f.shape:
+            o = cv2.resize(o, (occl_f.shape[1], occl_f.shape[0]))
+        occl_f = np.clip(o / 255.0, 0.0, 1.0)
+    not_occl = (1.0 - occl_f)                        # 1 = safe to edit
     lab = cv2.cvtColor(roi, cv2.COLOR_BGR2LAB)
     li = lab[..., 0].astype(np.float32)
     base = cv2.ximgproc.guidedFilter(guide=lab[..., 0], src=li, radius=8, eps=80.0)
@@ -247,7 +255,9 @@ def _retouch_roi(
 
     # --- under-eye v4: close the measured gap to the <10 target
     if s_eye > 0:
-        eye_m = under_eye_mask(face)
+        eye_m = under_eye_mask(face).astype(np.float32)
+        # occlusion guard: a hand under the eye is never lift-target skin
+        eye_m = eye_m * not_occl
         cheek_l = float(np.percentile(
             base[skin_m > 200], 60)) if (skin_m > 200).any() else float(np.mean(base))
         # Darkness-proportional dodge toward the cheek reference. v4 changes
@@ -308,6 +318,11 @@ def _retouch_roi(
     sharp_a = 0.35 * max(s_skin, 0.3)  # subtle, scales with overall intensity
     if sharp_a > 0:
         feat_m = cv2.subtract(_mask_poly(h, w, face.poly(FACE_OVAL)), skin_m)
+        # occluders are neither skin nor features: exclude them entirely
+        # (without this a hand in the oval reads as a "feature" and gets
+        # sharpened -- measured 0.8-12 levels on the synthetic hand)
+        feat_f = feat_m.astype(np.float32) * not_occl
+        feat_m = feat_f.astype(np.uint8)
         feat_m = _feather(feat_m, 15)
         out = unsharp_detail(out, feat_m, sharp_a)
 
@@ -327,11 +342,15 @@ def _apply_face_effects(
     face: FaceFrame,
     preset: Preset,
     seg_skin: np.ndarray | None = None,
+    occl: np.ndarray | None = None,
 ) -> np.ndarray:
     """Classic Tier A effects, confined to the face ROI.
 
     seg_skin: optional true-skin mask (from the Segmenter) at frame
     resolution; when present it refines the landmark oval approximation.
+    occl: optional uint8 occluder matte (hands/glasses/props) at frame
+    resolution; regional masks are multiplied by its complement so occluded
+    pixels pass through to the camera untouched.
     """
     out = frame.copy()
     fh, fw = out.shape[:2]
@@ -361,7 +380,14 @@ def _apply_face_effects(
             skin_refine = cv2.resize(skin_refine, (roi.shape[1], roi.shape[0]))
         if not skin_refine.size:
             skin_refine = None
-    out[y0:y1 + 1, x0:x1 + 1] = _retouch_roi(roi, shifted, preset, skin_refine)
+    occl_roi_c = None
+    if occl is not None and occl.size and occl.shape[:2] == out.shape[:2]:
+        occl_roi_c = occl[y0:y1 + 1, x0:x1 + 1]
+        if occl_roi_c.size and occl_roi_c.shape[:2] != roi.shape[:2]:
+            occl_roi_c = cv2.resize(occl_roi_c, (roi.shape[1], roi.shape[0]))
+        if not occl_roi_c.size:
+            occl_roi_c = None
+    out[y0:y1 + 1, x0:x1 + 1] = _retouch_roi(roi, shifted, preset, skin_refine, occl_roi_c)
     return out
 
 
@@ -424,6 +450,8 @@ def apply(
     # --- face effects (need a tracked face)
     if face is not None and preset.intensity > 0:
         seg_skin = segmenter.face_skin_mask() if segmenter is not None else None
+        occl = ((segmenter.occluder_mask() * 255).astype(np.uint8)
+                if segmenter is not None else None)
         eff_preset = preset
         bridged = face.extras.get("bridged")
         if bridged is not None:
@@ -431,7 +459,7 @@ def apply(
             # effects with the confidence ramp so a stale hold degrades to
             # passthrough instead of painting a frozen mask on a moving face
             eff_preset = replace(preset, intensity=float(preset.intensity) * float(bridged))
-        out = _apply_face_effects(out, face, eff_preset, seg_skin)
+        out = _apply_face_effects(out, face, eff_preset, seg_skin, occl)
 
     # --- reference color match: Reinhard LAB transfer inside the face oval
     # (geometry untouched; chroma clamped; verified against the drift cap)
