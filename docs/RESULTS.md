@@ -5,6 +5,16 @@ command to reproduce it. Nothing here was produced by running competitor
 software; benchmark targets are engineering targets authored from public
 claims (see `bedhead/benchmark.py` docstring).
 
+## Latency profile (all effects on, 720p)
+
+scripts/latency_profile.py, M-series CPU, 30 frames warm: track 5.4 ms,
+segmentation 6.6 mean (19.4 p95 on refresh frames), retouch 20.2, clothes
+15.0 amortized -> end-to-end 47.1 ms mean (21 fps ceiling with EVERY effect
+on incl. blur+studio+vibrance+clothes). Face-stack-only configs run 6-9 ms
+(110+ fps). 2026-10-25 perf round: blendLinear composites + LUT warmth
+(lighting) and crease-delta caching (clothes) took the all-on profile from
+63.2 -> 47.1 ms.
+
 ## Live quality scoreboard (8-metric benchmark)
 
 2026-10-25: under-eye v4 (deficit cap 85, k to 1.05, mid-feather full alpha,
